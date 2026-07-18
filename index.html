@@ -1,0 +1,2435 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portfolio IRR Tracker</title>
+<style>
+/* ---------- Theme tokens (light default) ---------- */
+:root {
+  color-scheme: light;
+  --page:            #f9f9f7;
+  --surface-1:       #fcfcfb;
+  --text-primary:    #0b0b0b;
+  --text-secondary:  #52514e;
+  --text-muted:      #898781;
+  --grid:            #e1e0d9;
+  --baseline:        #c3c2b7;
+  --border:          rgba(11,11,11,0.10);
+  --series-1:        #2a78d6;  /* blue   — your portfolio / balance */
+  --series-2:        #1baf7a;  /* aqua   */
+  --series-3:        #eda100;  /* yellow */
+  --series-4:        #008300;  /* green  */
+  --series-5:        #4a3aa7;  /* violet */
+  --good-text:       #006300;
+  --bad-text:        #d03b3b;
+  --accent:          #2a78d6;
+  --accent-ink:      #ffffff;
+  --danger:          #d03b3b;
+  --wash:            rgba(42,120,214,0.08);
+  --shadow:          0 1px 2px rgba(11,11,11,0.04), 0 4px 16px rgba(11,11,11,0.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page:            #0d0d0d;
+    --surface-1:       #1a1a19;
+    --text-primary:    #ffffff;
+    --text-secondary:  #c3c2b7;
+    --text-muted:      #898781;
+    --grid:            #2c2c2a;
+    --baseline:        #383835;
+    --border:          rgba(255,255,255,0.10);
+    --series-1:        #3987e5;
+    --series-2:        #199e70;
+    --series-3:        #c98500;
+    --series-4:        #008300;
+    --series-5:        #9085e9;
+    --good-text:       #0ca30c;
+    --bad-text:        #e66767;
+    --accent:          #3987e5;
+    --accent-ink:      #ffffff;
+    --danger:          #e66767;
+    --wash:            rgba(57,135,229,0.12);
+    --shadow:          none;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page:            #0d0d0d;
+  --surface-1:       #1a1a19;
+  --text-primary:    #ffffff;
+  --text-secondary:  #c3c2b7;
+  --text-muted:      #898781;
+  --grid:            #2c2c2a;
+  --baseline:        #383835;
+  --border:          rgba(255,255,255,0.10);
+  --series-1:        #3987e5;
+  --series-2:        #199e70;
+  --series-3:        #c98500;
+  --series-4:        #008300;
+  --series-5:        #9085e9;
+  --good-text:       #0ca30c;
+  --bad-text:        #e66767;
+  --accent:          #3987e5;
+  --accent-ink:      #ffffff;
+  --danger:          #e66767;
+  --wash:            rgba(57,135,229,0.12);
+  --shadow:          none;
+}
+
+/* ---------- Base ---------- */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--page);
+  color: var(--text-primary);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+h1,h2,h3 { font-weight: 650; letter-spacing: -0.01em; }
+button { font: inherit; color: inherit; }
+input, select { font: inherit; color: var(--text-primary); }
+a { color: var(--accent); }
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px 64px; }
+
+/* ---------- Header ---------- */
+.app-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 20px 0 14px; flex-wrap: wrap;
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand .logo {
+  width: 38px; height: 38px; border-radius: 10px; background: var(--accent);
+  display: grid; place-items: center; color: #fff; flex: none;
+}
+.brand h1 { font-size: 19px; margin: 0; }
+.brand .sub { margin: 0; font-size: 12.5px; color: var(--text-muted); }
+.header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#save-indicator { font-size: 12px; color: var(--text-muted); margin-right: 4px; }
+
+/* ---------- Buttons ---------- */
+.btn {
+  border: 1px solid var(--border); background: var(--surface-1);
+  border-radius: 9px; padding: 7px 13px; cursor: pointer; font-size: 13.5px;
+  font-weight: 550; color: var(--text-primary); transition: background .12s;
+}
+.btn:hover { background: var(--wash); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn-primary:hover { filter: brightness(1.08); background: var(--accent); }
+.btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn-danger:hover { filter: brightness(1.08); background: var(--danger); }
+.btn-sm { padding: 4px 9px; font-size: 12.5px; border-radius: 7px; }
+.icon-btn {
+  border: none; background: transparent; border-radius: 7px; cursor: pointer;
+  width: 28px; height: 28px; display: inline-grid; place-items: center;
+  color: var(--text-muted); padding: 0;
+}
+.icon-btn:hover { background: var(--wash); color: var(--text-primary); }
+.icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.icon-btn:disabled:hover { background: transparent; color: var(--text-muted); }
+.icon-btn svg { width: 15px; height: 15px; }
+.icon-btn.locked { color: var(--series-3); }
+
+/* ---------- Tabs ---------- */
+.tabs {
+  display: flex; gap: 4px; background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: 12px; padding: 4px; margin: 6px 0 22px; overflow-x: auto;
+}
+.tab-btn {
+  flex: 1; border: none; background: transparent; padding: 9px 14px;
+  border-radius: 9px; cursor: pointer; font-size: 14px; font-weight: 550;
+  color: var(--text-secondary); white-space: nowrap;
+}
+.tab-btn:hover { color: var(--text-primary); }
+.tab-btn.active { background: var(--accent); color: var(--accent-ink); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ---------- Cards ---------- */
+.card {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: 14px; padding: 18px 20px; margin-bottom: 18px; box-shadow: var(--shadow);
+}
+.card h2 { font-size: 15.5px; margin: 0 0 4px; }
+.card .card-sub { font-size: 12.5px; color: var(--text-muted); margin: 0 0 14px; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+/* ---------- Stat tiles ---------- */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 18px; }
+.stat {
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px;
+  padding: 15px 18px; box-shadow: var(--shadow);
+}
+.stat .label { font-size: 12.5px; color: var(--text-muted); }
+.stat .value { font-size: 26px; font-weight: 650; letter-spacing: -0.015em; margin-top: 2px; }
+.stat.hero .value { font-size: 34px; }
+.stat .delta { font-size: 12.5px; margin-top: 3px; color: var(--text-secondary); }
+.delta-up { color: var(--good-text); font-weight: 600; }
+.delta-down { color: var(--bad-text); font-weight: 600; }
+
+/* Benchmark chips */
+.bench-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 18px; }
+.bench-chip {
+  display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 999px;
+  padding: 5px 12px; color: var(--text-secondary);
+}
+.bench-chip i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
+.bench-chip b { color: var(--text-primary); font-weight: 600; }
+
+/* ---------- Tables ---------- */
+.table-scroll { overflow-x: auto; }
+table.data { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.data th {
+  text-align: right; font-weight: 600; font-size: 12px; color: var(--text-muted);
+  padding: 8px 10px; border-bottom: 1px solid var(--baseline); white-space: nowrap;
+}
+table.data th:first-child, table.data td:first-child { text-align: left; }
+table.data td {
+  text-align: right; padding: 9px 10px; border-bottom: 1px solid var(--grid);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+table.data tr:last-child td { border-bottom: none; }
+table.data tbody tr:hover { background: var(--wash); }
+table.data td.actions { text-align: right; }
+table.data tfoot td { font-weight: 650; border-top: 1px solid var(--baseline); border-bottom: none; }
+.pos { color: var(--good-text); }
+.neg { color: var(--bad-text); }
+.badge {
+  display: inline-block; font-size: 10.5px; font-weight: 600; border-radius: 5px;
+  padding: 1px 6px; margin-left: 7px; vertical-align: 1px;
+  background: var(--wash); color: var(--accent); border: 1px solid var(--border);
+}
+td input.cell-input {
+  width: 110px; text-align: right; padding: 5px 8px; border-radius: 7px;
+  border: 1px solid var(--baseline); background: var(--surface-1);
+  font-variant-numeric: tabular-nums;
+}
+td input.cell-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+
+/* ---------- Forms ---------- */
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.field input, .field select {
+  padding: 8px 10px; border-radius: 9px; border: 1px solid var(--baseline);
+  background: var(--surface-1); min-width: 0;
+}
+.field input:focus, .field select:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.field .hint { font-size: 11.5px; color: var(--text-muted); }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
+.inline-form { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+
+/* ---------- Charts ---------- */
+.chart { position: relative; margin-top: 6px; }
+.chart-svg { width: 100%; height: auto; display: block; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 4px 0 6px; }
+.legend .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); }
+.legend .chip i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.tooltip {
+  position: absolute; top: 8px; pointer-events: none; display: none; z-index: 5;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.18); padding: 8px 11px; font-size: 12.5px; min-width: 150px;
+}
+.tooltip .tt-title { font-weight: 650; margin-bottom: 4px; }
+.tooltip .tt-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; color: var(--text-secondary); }
+.tooltip .tt-row i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; flex: none; }
+.tooltip .tt-row b { color: var(--text-primary); font-variant-numeric: tabular-nums; font-weight: 600; }
+.empty-chart { color: var(--text-muted); font-size: 13px; padding: 30px 0; text-align: center; }
+
+/* ---------- Misc ---------- */
+.empty-state { text-align: center; padding: 36px 20px; color: var(--text-secondary); }
+.empty-state h3 { margin: 0 0 6px; }
+.empty-state p { margin: 0 0 16px; font-size: 13.5px; color: var(--text-muted); }
+.note { font-size: 12px; color: var(--text-muted); }
+.lock-banner {
+  display: flex; align-items: center; gap: 8px; font-size: 12.5px;
+  background: var(--wash); border: 1px solid var(--border); color: var(--text-secondary);
+  border-radius: 9px; padding: 8px 12px; margin-bottom: 12px;
+}
+.account-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--grid); }
+.account-row:last-child { border-bottom: none; }
+.account-row .name { flex: 1; font-weight: 550; }
+.account-row input { flex: 1; padding: 5px 9px; border-radius: 7px; border: 1px solid var(--baseline); background: var(--surface-1); }
+.scenario-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.scenario-card { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; background: var(--surface-1); }
+.scenario-card h3 { font-size: 14.5px; margin: 0; }
+.scenario-card .meta { font-size: 12px; color: var(--text-muted); margin: 2px 0 10px; }
+.scenario-card table { width: 100%; font-size: 12.5px; border-collapse: collapse; }
+.scenario-card table td { padding: 3px 0; font-variant-numeric: tabular-nums; }
+.scenario-card table td:last-child { text-align: right; font-weight: 600; }
+.scenario-card .sc-actions { display: flex; justify-content: flex-end; gap: 4px; margin-top: 8px; }
+
+/* ---------- Modal & toast ---------- */
+#modal-root { display: none; }
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 50;
+  display: grid; place-items: center; padding: 20px;
+}
+.modal {
+  background: var(--surface-1); border-radius: 16px; padding: 22px 24px;
+  max-width: 420px; width: 100%; border: 1px solid var(--border);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+.modal h3 { margin: 0 0 8px; font-size: 16px; }
+.modal p { margin: 0 0 18px; color: var(--text-secondary); font-size: 13.5px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+#toast {
+  position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%) translateY(10px);
+  background: var(--text-primary); color: var(--page); font-size: 13px; font-weight: 550;
+  padding: 9px 18px; border-radius: 999px; opacity: 0; pointer-events: none;
+  transition: opacity .2s, transform .2s; z-index: 60;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@media (max-width: 640px) {
+  .stat .value { font-size: 22px; }
+  .stat.hero .value { font-size: 27px; }
+}
+
+/* ---------- v2 additions ---------- */
+#save-indicator.warn { color: var(--series-3); font-weight: 600; }
+.note-line {
+  font-size: 11px; color: var(--text-muted); font-weight: 400;
+  max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.chip-toggle {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 999px; padding: 5px 13px;
+  font-size: 12.5px; font-weight: 550; background: var(--surface-1); color: var(--text-secondary);
+}
+.chip-toggle:hover { background: var(--wash); }
+.chip-toggle.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.alloc-bar { display: flex; gap: 2px; height: 18px; border-radius: 6px; overflow: hidden; margin: 10px 0 8px; }
+.alloc-bar i { display: block; height: 100%; }
+.sens-hot { background: var(--wash); font-weight: 700; }
+.modal textarea {
+  width: 100%; min-height: 140px; resize: vertical; margin-bottom: 16px;
+  padding: 9px 11px; border-radius: 9px; border: 1px solid var(--baseline);
+  background: var(--surface-1); color: var(--text-primary); font: 12.5px/1.5 ui-monospace, monospace;
+}
+.modal input.modal-input {
+  width: 100%; margin-bottom: 16px; padding: 9px 11px; border-radius: 9px;
+  border: 1px solid var(--baseline); background: var(--surface-1); color: var(--text-primary);
+}
+.modal textarea:focus, .modal input.modal-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.field label.check { display: flex; align-items: center; gap: 8px; font-weight: 400; font-size: 13px; color: var(--text-primary); padding: 8px 0; cursor: pointer; }
+.field label.check input { width: 16px; height: 16px; accent-color: var(--accent); }
+@media print {
+  body { background: #fff; }
+  .header-actions, .tabs, .icon-btn, .btn, td.actions, #toast, .lock-banner, .no-print { display: none !important; }
+  .card, .stat { box-shadow: none; break-inside: avoid; }
+  .tooltip { display: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="app-header">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M2 15 L7 9 L11 12 L18 4" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.5 4 H18 V8.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div>
+        <h1>Portfolio IRR Tracker</h1>
+        <p class="sub">All data stays in this browser — nothing is uploaded</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span id="save-indicator"></span>
+      <button class="btn btn-sm" id="file-btn" onclick="App.fileButton()" title="Auto-save your data to a real file on disk (survives browser data clearing; put it in iCloud Drive to sync)" style="display:none"></button>
+      <button class="btn btn-sm" onclick="App.exportCSV()" title="Download the overview table as CSV">Export CSV</button>
+      <button class="btn btn-sm" onclick="App.exportJSON()" title="Download a full backup of all data (optionally encrypted)">Backup</button>
+      <button class="btn btn-sm" onclick="App.importJSON()" title="Restore from a backup file (replace or merge)">Restore</button>
+      <button class="btn btn-sm" onclick="App.historyOpen()" title="Automatic daily snapshots — restore a previous version">History</button>
+      <button class="btn btn-sm" id="theme-btn" onclick="App.cycleTheme()" title="Theme">Theme: Auto</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab-btn active" data-tab="overview"  onclick="App.showTab('overview')"  role="tab">Portfolio Overview</button>
+    <button class="tab-btn"        data-tab="entry"     onclick="App.showTab('entry')"     role="tab">Data Entry</button>
+    <button class="tab-btn"        data-tab="analysis"  onclick="App.showTab('analysis')"  role="tab">Analysis</button>
+    <button class="tab-btn"        data-tab="scenarios" onclick="App.showTab('scenarios')" role="tab">Saved Scenarios</button>
+  </nav>
+
+  <!-- ================= TAB 1 : OVERVIEW ================= -->
+  <section class="tab-panel active" id="tab-overview">
+    <div id="ov-stats"></div>
+    <div id="ov-bench-chips"></div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Portfolio vs. benchmarks</h2>
+          <p class="card-sub">Your actual year-end balances against the same deposits grown at each benchmark's rate</p>
+        </div>
+      </div>
+      <div id="ov-chart" class="chart"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Yearly results</h2>
+          <p class="card-sub">Annual IRR assumes deposits were spread evenly through the year (mid-year convention)</p>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sm" onclick="App.importCSV()">Import CSV</button>
+          <button class="btn btn-primary btn-sm" onclick="App.addYear()">＋ Add year</button>
+        </div>
+      </div>
+      <div id="ov-table" class="table-scroll"></div>
+    </div>
+
+    <div id="ov-accounts"></div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Benchmarks</h2>
+          <p class="card-sub">Long-run average annual returns used for comparison — edit to taste</p>
+        </div>
+        <button class="btn btn-sm" onclick="App.addBenchmark()">＋ Add benchmark</button>
+      </div>
+      <div id="ov-benchmarks"></div>
+    </div>
+
+    <p class="note">Methodology: each year's IRR solves <em>start · (1+r) + deposits · (1+r)<sup>½</sup> = ending</em>, i.e. deposits are treated as arriving mid-year. Overall IRR is the money-weighted return across all years (initial balance at the start, each year's deposits at that year's midpoint, final balance at the end). Benchmark paths apply the identical cash flows at the benchmark's returns — real calendar-year returns where the series has data, the flat rate elsewhere.</p>
+  </section>
+
+  <!-- ================= TAB 2 : DATA ENTRY ================= -->
+  <section class="tab-panel" id="tab-entry">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Accounts</h2>
+          <p class="card-sub">List each account you hold (401k, Roth IRA, brokerage…). You'll enter balances per account, per year.</p>
+        </div>
+      </div>
+      <div id="en-accounts"></div>
+      <div class="inline-form" style="margin-top:12px">
+        <div class="field" style="flex:1;min-width:180px">
+          <label for="en-new-account">New account name</label>
+          <input id="en-new-account" placeholder="e.g. Vanguard Roth IRA" onkeydown="if(event.key==='Enter')App.addAccount()">
+        </div>
+        <button class="btn btn-primary" onclick="App.addAccount()">Add account</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Year-end balances by account</h2>
+          <p class="card-sub">Totals flow automatically into the matching row of Portfolio Overview</p>
+        </div>
+        <div class="inline-form">
+          <div class="field">
+            <label for="en-year-select">Year</label>
+            <select id="en-year-select" onchange="App.entryYearChanged(this.value)"></select>
+          </div>
+        </div>
+      </div>
+      <div id="en-grid"></div>
+    </div>
+  </section>
+
+  <!-- ================= TAB 3 : ANALYSIS ================= -->
+  <section class="tab-panel" id="tab-analysis">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Projection inputs</h2>
+          <p class="card-sub">Deposits are assumed to be spread evenly through each year, matching the IRR convention</p>
+        </div>
+        <button class="btn btn-sm" id="an-use-current" onclick="App.anUseCurrent()"></button>
+      </div>
+      <div class="form-grid">
+        <div class="field">
+          <label for="an-start">Starting amount ($)</label>
+          <input id="an-start" inputmode="decimal">
+        </div>
+        <div class="field">
+          <label for="an-ret">Annual return (%)</label>
+          <input id="an-ret" inputmode="decimal">
+        </div>
+        <div class="field">
+          <label for="an-dep">Annual deposits ($)</label>
+          <input id="an-dep" inputmode="decimal">
+        </div>
+        <div class="field">
+          <label for="an-depg">Deposit growth (%/yr)</label>
+          <input id="an-depg" inputmode="decimal">
+          <span class="hint">e.g. raises — deposits grow this much yearly</span>
+        </div>
+        <div class="field">
+          <label for="an-infl">Inflation (%/yr)</label>
+          <input id="an-infl" inputmode="decimal">
+          <span class="hint">used for "today's dollars" figures</span>
+        </div>
+        <div class="field">
+          <label for="an-target">Milestone target ($)</label>
+          <input id="an-target" inputmode="decimal">
+        </div>
+        <div class="field">
+          <label for="an-depyrs">Contribute for (years)</label>
+          <input id="an-depyrs" inputmode="decimal">
+          <span class="hint">deposits stop after this many years</span>
+        </div>
+        <div class="field">
+          <label for="an-wd">Then withdraw ($/yr)</label>
+          <input id="an-wd" inputmode="decimal">
+          <span class="hint">starts after deposits stop; rises with inflation</span>
+        </div>
+        <div class="field">
+          <label for="an-vol">Volatility (%/yr)</label>
+          <input id="an-vol" inputmode="decimal">
+          <span class="hint">std-dev of returns — ~15 for stocks, ~10 for 60/40</span>
+        </div>
+        <div class="field">
+          <label>Monte Carlo</label>
+          <label class="check"><input type="checkbox" id="an-mc"> Show 10th–90th percentile range</label>
+        </div>
+      </div>
+    </div>
+
+    <div id="an-results"></div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>30-year projection</h2>
+          <p class="card-sub" id="an-milestone"></p>
+        </div>
+      </div>
+      <div id="an-chart" class="chart"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Sensitivity — 30-year balance</h2>
+          <p class="card-sub">How the outcome shifts with return and deposit level (your other inputs held fixed); your closest cell is highlighted</p>
+        </div>
+      </div>
+      <div id="an-sens" class="table-scroll"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Save this scenario</h2>
+          <p class="card-sub">Saved scenarios appear in the Saved Scenarios tab, where you can later compare them against reality</p>
+        </div>
+      </div>
+      <div class="inline-form">
+        <div class="field" style="flex:1;min-width:200px">
+          <label for="an-scenario-name">Scenario name</label>
+          <input id="an-scenario-name" placeholder='e.g. "7% + $12k/yr baseline"' onkeydown="if(event.key==='Enter')App.saveScenario()">
+        </div>
+        <div class="field" style="flex:1.4;min-width:220px">
+          <label for="an-scenario-note">Note (optional)</label>
+          <input id="an-scenario-note" placeholder="context for future-you" onkeydown="if(event.key==='Enter')App.saveScenario()">
+        </div>
+        <button class="btn btn-primary" onclick="App.saveScenario()">Save scenario</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TAB 4 : SAVED SCENARIOS ================= -->
+  <section class="tab-panel" id="tab-scenarios">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Saved scenarios</h2>
+          <p class="card-sub">Snapshots of Analysis projections — lock the ones you want to preserve</p>
+        </div>
+      </div>
+      <div id="sc-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Expected vs. actual</h2>
+          <p class="card-sub">How your real portfolio is tracking against saved projections — toggle up to 3 to overlay</p>
+        </div>
+      </div>
+      <div id="sc-compare-chips" class="chip-row" style="margin-bottom:8px"></div>
+      <div id="sc-compare"></div>
+    </div>
+  </section>
+
+</div>
+
+<div id="modal-root"></div>
+<div id="toast" role="status"></div>
+<input type="file" id="import-file" accept=".json,application/json" style="display:none">
+
+<script>
+/* =====================================================================
+   Portfolio IRR Tracker — single-file app, all data in localStorage.
+   ===================================================================== */
+(function () {
+  'use strict';
+
+  const LS_KEY = 'irr-tracker-v1';
+  const HORIZONS = [5, 10, 20, 30];
+  const MAX_HORIZON = 30;
+
+  const DEFAULT_BENCHMARKS = [
+    { name: 'S&P 500',            rate: 10.0, series: 'sp500' },
+    { name: '60/40 portfolio',    rate: 8.0,  series: '6040'  },
+    { name: 'US bonds',           rate: 4.5,  series: 'bonds' },
+    { name: 'High-yield savings', rate: 4.0,  series: 'cash'  },
+  ];
+
+  // Real calendar-year total returns (%), 2000–2025 (2025 approximate).
+  // Years outside this range fall back to the benchmark's flat rate.
+  const HIST = {
+    sp500: { 2000:-9.1, 2001:-11.9, 2002:-22.1, 2003:28.7, 2004:10.9, 2005:4.9, 2006:15.8, 2007:5.5,
+             2008:-37.0, 2009:26.5, 2010:15.1, 2011:2.1, 2012:16.0, 2013:32.4, 2014:13.7, 2015:1.4,
+             2016:12.0, 2017:21.8, 2018:-4.4, 2019:31.5, 2020:18.4, 2021:28.7, 2022:-18.1, 2023:26.3,
+             2024:25.0, 2025:24.0 },
+    bonds: { 2000:11.6, 2001:8.4, 2002:10.3, 2003:4.1, 2004:4.3, 2005:2.4, 2006:4.3, 2007:7.0,
+             2008:5.2, 2009:5.9, 2010:6.5, 2011:7.8, 2012:4.2, 2013:-2.0, 2014:6.0, 2015:0.5,
+             2016:2.6, 2017:3.5, 2018:0.0, 2019:8.7, 2020:7.5, 2021:-1.5, 2022:-13.0, 2023:5.5,
+             2024:1.3, 2025:6.0 },
+    cash:  { 2000:5.9, 2001:3.9, 2002:1.7, 2003:1.0, 2004:1.2, 2005:3.0, 2006:4.8, 2007:4.7,
+             2008:1.8, 2009:0.2, 2010:0.1, 2011:0.1, 2012:0.1, 2013:0.1, 2014:0.0, 2015:0.1,
+             2016:0.3, 2017:0.9, 2018:1.9, 2019:2.2, 2020:0.6, 2021:0.1, 2022:1.5, 2023:5.0,
+             2024:5.2, 2025:4.4 },
+  };
+  HIST['6040'] = {};
+  Object.keys(HIST.sp500).forEach(y => {
+    if (HIST.bonds[y] != null) HIST['6040'][y] = +(0.6 * HIST.sp500[y] + 0.4 * HIST.bonds[y]).toFixed(2);
+  });
+  const SERIES_LABELS = { flat: 'Flat rate', sp500: 'S&P 500 (actual)', '6040': '60/40 (actual)', bonds: 'US bonds (actual)', cash: 'Cash / T-bills (actual)' };
+
+  /* ---------------- State ---------------- */
+
+  function freshState() {
+    return {
+      accounts: [],                // [{id, name}]
+      years: {},                   // { "2024": {start, deposits, ending, locked, entries:{accId:{dep,end}}} }
+      scenarios: [],               // [{id, name, start, ret, dep, depGrowth, infl, baseYear, created, locked}]
+      benchmarks: DEFAULT_BENCHMARKS.map(b => ({ ...b })),
+      settings: {
+        theme: 'auto',
+        analysis: { start: null, ret: 7, dep: 12000, depGrowth: 0, infl: 2.5, target: 1000000,
+                    depUntil: 30, wd: 0, vol: 15, mc: false },
+        compareIds: [],
+        lastBackupAt: null,
+      },
+      modifiedAt: 0,
+    };
+  }
+
+  function sanitizeState(s) {
+    const base = freshState();
+    const out = {
+      ...base, ...s,
+      benchmarks: Array.isArray(s.benchmarks) ? s.benchmarks : base.benchmarks,
+      settings: { ...base.settings, ...(s.settings || {}), analysis: { ...base.settings.analysis, ...((s.settings || {}).analysis || {}) } },
+    };
+    // migrations
+    out.benchmarks.forEach(b => {
+      if (!b.series) {
+        b.series = /s\s*&?\s*p\s*500/i.test(b.name) ? 'sp500'
+          : /60\s*\/\s*40/.test(b.name) ? '6040'
+          : /bond/i.test(b.name) ? 'bonds'
+          : /saving|cash|t-?bill|money market/i.test(b.name) ? 'cash' : 'flat';
+      }
+    });
+    if (!Array.isArray(out.settings.compareIds)) {
+      out.settings.compareIds = out.settings.compareId ? [out.settings.compareId] : [];
+    }
+    delete out.settings.compareId;
+    return out;
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return null;
+      const s = JSON.parse(raw);
+      if (!s || typeof s !== 'object') return null;
+      return sanitizeState(s);
+    } catch (e) { return null; }
+  }
+
+  let state = load() || freshState();
+  let editingYear = null;          // year currently being edited inline in overview
+  let entryYear = null;            // year selected in the Data Entry tab
+  let currentTab = 'overview';
+
+  const SNAP_KEY = 'irr-tracker-snapshots';
+
+  function snapshot() {
+    try {
+      const snaps = JSON.parse(localStorage.getItem(SNAP_KEY) || '[]');
+      const today = new Date().toISOString().slice(0, 10);
+      const entry = { date: today, ts: Date.now(), data: JSON.stringify(state) };
+      const i = snaps.findIndex(x => x.date === today);
+      if (i >= 0) snaps[i] = entry; else snaps.push(entry);
+      while (snaps.length > 20) snaps.shift();
+      localStorage.setItem(SNAP_KEY, JSON.stringify(snaps));
+    } catch (e) { /* quota — snapshots are best-effort */ }
+  }
+
+  function updateSaveIndicator() {
+    const el = document.getElementById('save-indicator');
+    const time = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    let warn = false;
+    let txt = 'Saved locally · ' + time;
+    if (fileStatus === 'connected') {
+      txt = 'Auto-saved to file · ' + time;
+    } else {
+      const lb = state.settings.lastBackupAt;
+      const hasData = Object.keys(state.years).length > 0;
+      const days = lb ? Math.floor((Date.now() - lb) / 86400000) : null;
+      if (days == null) { if (hasData) { txt += ' · never backed up'; warn = true; } }
+      else if (days > 0) { txt += ' · backup ' + days + 'd ago'; warn = days > 30; }
+    }
+    el.textContent = txt;
+    el.classList.toggle('warn', warn);
+  }
+
+  function save() {
+    state.modifiedAt = Date.now();
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+    snapshot();
+    scheduleFileWrite();
+    updateSaveIndicator();
+  }
+
+  // Replace all state (restore / merge / file-load) and re-render.
+  function adoptState(data) {
+    state = sanitizeState(data);
+    entryYear = null; editingYear = null;
+    applyTheme();
+    save();
+    renderAll();
+  }
+
+  /* ---------------- Math ---------------- */
+
+  function bisect(f, lo, hi, iter) {
+    let flo = f(lo), fhi = f(hi);
+    if (!isFinite(flo) || !isFinite(fhi) || flo * fhi > 0) return null;
+    for (let i = 0; i < (iter || 200); i++) {
+      const mid = (lo + hi) / 2, fm = f(mid);
+      if (fm === 0) return mid;
+      if (flo * fm < 0) { hi = mid; fhi = fm; } else { lo = mid; flo = fm; }
+    }
+    return (lo + hi) / 2;
+  }
+
+  // Solve start*(1+r) + dep*(1+r)^0.5 = end  (deposits spread evenly ≈ mid-year)
+  function yearIRR(start, dep, end) {
+    if (start + dep <= 0) return null;
+    const f = r => start * (1 + r) + dep * Math.sqrt(1 + r) - end;
+    return bisect(f, -0.999999, 20);
+  }
+
+  // Money-weighted IRR across all years.
+  function overallIRR(rows) {
+    if (!rows.length) return null;
+    const y0 = rows[0].year;
+    const flows = [];
+    if (rows[0].start) flows.push({ t: 0, amt: -rows[0].start });
+    rows.forEach(r => { if (r.deposits) flows.push({ t: (r.year - y0) + 0.5, amt: -r.deposits }); });
+    const last = rows[rows.length - 1];
+    flows.push({ t: (last.year - y0) + 1, amt: last.ending });
+    if (flows.length < 2) return null;
+    const f = r => flows.reduce((s, c) => s + c.amt * Math.pow(1 + r, -c.t), 0);
+    return bisect(f, -0.999999, 20);
+  }
+
+  // Benchmark rate for a given calendar year: real historical return when the
+  // benchmark uses a series and data exists, else its flat rate. Decimal.
+  function rateFor(b, year) {
+    const h = b.series && b.series !== 'flat' ? HIST[b.series] : null;
+    const v = h ? h[year] : null;
+    return (v == null ? b.rate : v) / 100;
+  }
+
+  // Same cash flows grown at the benchmark's rate. Returns [{x: year, y: balance}],
+  // with a leading point at (firstYear - 1) representing the starting balance.
+  function simulatePath(rows, b) {
+    if (!rows.length) return [];
+    let bal = rows[0].start || 0;
+    let prev = rows[0].year - 1;
+    const pts = [{ x: prev, y: bal }];
+    rows.forEach(r => {
+      for (let y = prev + 1; y < r.year; y++) bal *= (1 + rateFor(b, y));
+      const rate = rateFor(b, r.year);
+      bal = bal * (1 + rate) + (r.deposits || 0) * Math.sqrt(Math.max(0, 1 + rate));
+      prev = r.year;
+      pts.push({ x: r.year, y: bal });
+    });
+    return pts;
+  }
+
+  // Money-weighted IRR the benchmark would have earned on your exact cash flows.
+  function benchmarkIRR(rows, b) {
+    const path = simulatePath(rows, b);
+    if (!path.length) return null;
+    const rows2 = rows.map(r => ({ year: r.year, start: r.start, deposits: r.deposits, ending: r.ending }));
+    rows2[rows2.length - 1].ending = path[path.length - 1].y;
+    return overallIRR(rows2);
+  }
+
+  // Forward projection with optional deposit-stop + withdrawals.
+  // p = {start, ret, dep, depGrowth, infl, depUntil, wd} (rates as decimals).
+  // Returns [{i, bal, contrib}] with .depleted = first year balance hit 0 (or null).
+  function project(p, horizon) {
+    let bal = p.start, contrib = p.start, d = p.dep, w = p.wd || 0, depleted = null;
+    const du = p.depUntil == null ? horizon : p.depUntil;
+    const pts = [{ i: 0, bal: bal, contrib: contrib }];
+    for (let i = 1; i <= horizon; i++) {
+      const g = Math.sqrt(Math.max(0, 1 + p.ret));
+      if (i <= du) {
+        bal = bal * (1 + p.ret) + d * g;
+        contrib += d;
+        d *= (1 + (p.depGrowth || 0));
+      } else {
+        bal = bal * (1 + p.ret) - w * g;
+        w *= (1 + (p.infl || 0));
+      }
+      if (bal <= 0) { bal = 0; if (depleted == null) depleted = i; }
+      pts.push({ i: i, bal: bal, contrib: contrib });
+    }
+    pts.depleted = depleted;
+    return pts;
+  }
+
+  // Monte Carlo: normal annual returns (mean p.ret, std-dev p.vol).
+  // Returns per-year {p10, p50, p90} percentiles of balance.
+  function mcSimulate(p, horizon, runs) {
+    const byYear = Array.from({ length: horizon + 1 }, () => []);
+    for (let s = 0; s < runs; s++) {
+      let bal = p.start, d = p.dep, w = p.wd || 0;
+      const du = p.depUntil == null ? horizon : p.depUntil;
+      byYear[0].push(bal);
+      for (let i = 1; i <= horizon; i++) {
+        let u = 0, v = 0;
+        while (!u) u = Math.random();
+        while (!v) v = Math.random();
+        const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+        const r = Math.max(-0.95, p.ret + (p.vol || 0) * z);
+        const g = Math.sqrt(1 + r);
+        if (i <= du) { bal = bal * (1 + r) + d * g; d *= (1 + (p.depGrowth || 0)); }
+        else { bal = bal * (1 + r) - w * g; w *= (1 + (p.infl || 0)); }
+        if (bal < 0) bal = 0;
+        byYear[i].push(bal);
+      }
+    }
+    const q = (arr, f) => {
+      const a = [...arr].sort((x, y) => x - y);
+      return a[Math.min(a.length - 1, Math.floor(f * a.length))];
+    };
+    return byYear.map(a => ({ p10: q(a, 0.1), p50: q(a, 0.5), p90: q(a, 0.9) }));
+  }
+
+  function sortedRows() {
+    return Object.keys(state.years).map(Number).sort((a, b) => a - b)
+      .map(y => ({ year: y, ...state.years[y] }));
+  }
+
+  function currentBalance() {
+    const rows = sortedRows();
+    return rows.length ? (rows[rows.length - 1].ending || 0) : 0;
+  }
+
+  /* ---------------- Formatting ---------------- */
+
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  function fmtMoney(v) {
+    if (v == null || !isFinite(v)) return '—';
+    const sign = v < 0 ? '−' : '';
+    return sign + '$' + Math.abs(Math.round(v)).toLocaleString('en-US');
+  }
+  function fmtMoneySigned(v) {
+    if (v == null || !isFinite(v)) return '—';
+    return (v >= 0 ? '+' : '−') + '$' + Math.abs(Math.round(v)).toLocaleString('en-US');
+  }
+  function fmtCompact(v) {
+    if (v == null || !isFinite(v)) return '—';
+    const a = Math.abs(v), s = v < 0 ? '−$' : '$';
+    if (a >= 1e9) return s + (a / 1e9).toFixed(a < 1e10 ? 1 : 0) + 'B';
+    if (a >= 1e6) return s + (a / 1e6).toFixed(a < 1e7 ? 2 : 1) + 'M';
+    if (a >= 1e3) return s + Math.round(a / 1e3) + 'K';
+    return s + Math.round(a);
+  }
+  function fmtPct(r, digits) {
+    if (r == null || !isFinite(r)) return '—';
+    return (r * 100).toFixed(digits == null ? 1 : digits) + '%';
+  }
+  function fmtPctSigned(r) {
+    if (r == null || !isFinite(r)) return '—';
+    return (r >= 0 ? '+' : '−') + Math.abs(r * 100).toFixed(1) + '%';
+  }
+  function parseNum(str) {
+    if (str == null) return 0;
+    const n = parseFloat(String(str).replace(/[$,%\s,]/g, ''));
+    return isFinite(n) ? n : 0;
+  }
+
+  /* ---------------- Icons ---------------- */
+
+  const ICONS = {
+    lock:   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="7" width="10" height="7" rx="1.6"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>',
+    unlock: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="7" width="10" height="7" rx="1.6"/><path d="M5.5 7V5a2.5 2.5 0 0 1 4.9-.7"/></svg>',
+    edit:   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11.3 2.7a1.7 1.7 0 0 1 2.4 2.4L5.5 13.3 2 14l.7-3.5z"/></svg>',
+    trash:  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 4.5h11M5.5 4.5V3a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1.5M4 4.5l.6 8.4a1 1 0 0 0 1 .9h4.8a1 1 0 0 0 1-.9l.6-8.4"/></svg>',
+    check:  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8.5l3.5 3.5 7.5-8"/></svg>',
+    x:      '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg>',
+  };
+  function iconBtn(icon, title, onclick, opts) {
+    opts = opts || {};
+    return '<button class="icon-btn ' + (opts.cls || '') + '" title="' + esc(title) + '" aria-label="' + esc(title) + '" ' +
+      (opts.disabled ? 'disabled ' : '') + 'onclick="' + onclick + '">' + ICONS[icon] + '</button>';
+  }
+
+  /* ---------------- Modal & toast ---------------- */
+
+  function confirmDialog(o) {
+    return new Promise(res => {
+      const root = document.getElementById('modal-root');
+      root.innerHTML =
+        '<div class="modal-backdrop"><div class="modal" role="dialog" aria-modal="true">' +
+        '<h3>' + esc(o.title) + '</h3><p>' + o.message + '</p>' +
+        '<div class="modal-actions">' +
+        '<button class="btn" id="m-cancel">Cancel</button>' +
+        '<button class="btn ' + (o.danger ? 'btn-danger' : 'btn-primary') + '" id="m-ok">' + esc(o.confirmText || 'Confirm') + '</button>' +
+        '</div></div></div>';
+      root.style.display = 'block';
+      const close = v => { root.style.display = 'none'; root.innerHTML = ''; document.removeEventListener('keydown', onKey); res(v); };
+      const onKey = e => { if (e.key === 'Escape') close(false); };
+      document.addEventListener('keydown', onKey);
+      root.querySelector('#m-cancel').onclick = () => close(false);
+      root.querySelector('#m-ok').onclick = () => close(true);
+      root.querySelector('.modal-backdrop').addEventListener('click', e => { if (e.target === e.currentTarget) close(false); });
+      root.querySelector('#m-ok').focus();
+    });
+  }
+
+  let toastTimer;
+  function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  // Generic modal with custom buttons. Resolves the clicked button's id, or null.
+  function choiceDialog(o) {
+    return new Promise(res => {
+      const root = document.getElementById('modal-root');
+      root.innerHTML =
+        '<div class="modal-backdrop"><div class="modal" role="dialog" aria-modal="true">' +
+        '<h3>' + esc(o.title) + '</h3><p>' + o.message + '</p>' +
+        (o.body || '') +
+        '<div class="modal-actions">' +
+        o.buttons.map(b => '<button class="btn ' + (b.cls || '') + '" data-choice="' + esc(b.id) + '">' + esc(b.label) + '</button>').join('') +
+        '</div></div></div>';
+      root.style.display = 'block';
+      const close = v => { root.style.display = 'none'; root.innerHTML = ''; document.removeEventListener('keydown', onKey); res(v); };
+      const onKey = e => { if (e.key === 'Escape') close(null); };
+      document.addEventListener('keydown', onKey);
+      root.querySelectorAll('[data-choice]').forEach(b => b.onclick = () => close(b.dataset.choice));
+      root.querySelector('.modal-backdrop').addEventListener('click', e => { if (e.target === e.currentTarget) close(null); });
+    });
+  }
+
+  // Single-line input modal. Resolves the string (may be ''), or null on cancel.
+  function promptDialog(o) {
+    return new Promise(res => {
+      const root = document.getElementById('modal-root');
+      root.innerHTML =
+        '<div class="modal-backdrop"><div class="modal" role="dialog" aria-modal="true">' +
+        '<h3>' + esc(o.title) + '</h3><p>' + o.message + '</p>' +
+        '<input class="modal-input" id="m-input" type="' + (o.password ? 'password' : 'text') + '" placeholder="' + esc(o.placeholder || '') + '">' +
+        '<div class="modal-actions">' +
+        '<button class="btn" id="m-cancel">Cancel</button>' +
+        '<button class="btn btn-primary" id="m-ok">' + esc(o.confirmText || 'OK') + '</button>' +
+        '</div></div></div>';
+      root.style.display = 'block';
+      const inp = root.querySelector('#m-input');
+      const close = v => { root.style.display = 'none'; root.innerHTML = ''; document.removeEventListener('keydown', onKey); res(v); };
+      const onKey = e => { if (e.key === 'Escape') close(null); };
+      document.addEventListener('keydown', onKey);
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') close(inp.value); });
+      root.querySelector('#m-cancel').onclick = () => close(null);
+      root.querySelector('#m-ok').onclick = () => close(inp.value);
+      root.querySelector('.modal-backdrop').addEventListener('click', e => { if (e.target === e.currentTarget) close(null); });
+      inp.focus();
+    });
+  }
+
+  // Multi-line paste modal. Resolves the text, or null on cancel.
+  function textareaDialog(o) {
+    return new Promise(res => {
+      const root = document.getElementById('modal-root');
+      root.innerHTML =
+        '<div class="modal-backdrop"><div class="modal" style="max-width:560px" role="dialog" aria-modal="true">' +
+        '<h3>' + esc(o.title) + '</h3><p>' + o.message + '</p>' +
+        '<textarea id="m-text" placeholder="' + esc(o.placeholder || '') + '"></textarea>' +
+        '<div class="modal-actions">' +
+        '<button class="btn" id="m-cancel">Cancel</button>' +
+        '<button class="btn btn-primary" id="m-ok">' + esc(o.confirmText || 'Import') + '</button>' +
+        '</div></div></div>';
+      root.style.display = 'block';
+      const ta = root.querySelector('#m-text');
+      const close = v => { root.style.display = 'none'; root.innerHTML = ''; document.removeEventListener('keydown', onKey); res(v); };
+      const onKey = e => { if (e.key === 'Escape') close(null); };
+      document.addEventListener('keydown', onKey);
+      root.querySelector('#m-cancel').onclick = () => close(null);
+      root.querySelector('#m-ok').onclick = () => close(ta.value);
+      root.querySelector('.modal-backdrop').addEventListener('click', e => { if (e.target === e.currentTarget) close(null); });
+      ta.focus();
+    });
+  }
+
+  /* ---------------- Encrypted backups (WebCrypto, all local) ---------------- */
+
+  const b64 = u8 => { let s = ''; u8.forEach(c => s += String.fromCharCode(c)); return btoa(s); };
+  const unb64 = str => Uint8Array.from(atob(str), c => c.charCodeAt(0));
+
+  async function deriveKey(pass, salt) {
+    const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt: salt, iterations: 200000, hash: 'SHA-256' },
+      km, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  }
+
+  async function encryptJSON(text, pass) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveKey(pass, salt);
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, new TextEncoder().encode(text));
+    return JSON.stringify({ format: 'irr-encrypted-v1', salt: b64(salt), iv: b64(iv), data: b64(new Uint8Array(ct)) }, null, 2);
+  }
+
+  async function decryptJSON(obj, pass) {
+    const key = await deriveKey(pass, unb64(obj.salt));
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(obj.iv) }, key, unb64(obj.data));
+    return new TextDecoder().decode(pt);
+  }
+
+  /* ---------------- File auto-save (File System Access API) ---------------- */
+
+  const fileSupported = 'showSaveFilePicker' in window;
+  let fileHandle = null;
+  let fileStatus = 'none';   // none | reconnect | connected | error
+  let fileWriteTimer = null;
+
+  const idb = {
+    _db: null,
+    open() {
+      return new Promise((res, rej) => {
+        const r = indexedDB.open('irr-tracker', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('kv');
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      });
+    },
+    async get(k) {
+      const db = this._db || (this._db = await this.open());
+      return new Promise((res, rej) => {
+        const t = db.transaction('kv').objectStore('kv').get(k);
+        t.onsuccess = () => res(t.result); t.onerror = () => rej(t.error);
+      });
+    },
+    async set(k, v) {
+      const db = this._db || (this._db = await this.open());
+      return new Promise((res, rej) => {
+        const t = db.transaction('kv', 'readwrite').objectStore('kv').put(v, k);
+        t.onsuccess = () => res(); t.onerror = () => rej(t.error);
+      });
+    },
+    async del(k) {
+      const db = this._db || (this._db = await this.open());
+      return new Promise((res, rej) => {
+        const t = db.transaction('kv', 'readwrite').objectStore('kv').delete(k);
+        t.onsuccess = () => res(); t.onerror = () => rej(t.error);
+      });
+    },
+  };
+
+  function renderFileStatus() {
+    const btn = document.getElementById('file-btn');
+    if (!fileSupported) { btn.style.display = 'none'; return; }
+    btn.style.display = '';
+    if (fileStatus === 'connected') {
+      let n = fileHandle && fileHandle.name || 'file';
+      if (n.length > 22) n = n.slice(0, 20) + '…';
+      btn.textContent = '✓ ' + n;
+      btn.title = 'Auto-saving every change to this file. Click to disconnect.';
+    } else if (fileStatus === 'reconnect') {
+      btn.textContent = '⚠ Reconnect file';
+      btn.title = 'Click to re-grant access to your data file';
+    } else if (fileStatus === 'error') {
+      btn.textContent = '⚠ File save failed';
+      btn.title = 'Click to retry / reconnect';
+    } else {
+      btn.textContent = 'Connect data file';
+    }
+  }
+
+  async function writeFile() {
+    const w = await fileHandle.createWritable();
+    await w.write(JSON.stringify(state, null, 2));
+    await w.close();
+  }
+
+  function scheduleFileWrite() {
+    if (fileStatus !== 'connected' || !fileHandle) return;
+    clearTimeout(fileWriteTimer);
+    fileWriteTimer = setTimeout(async () => {
+      try {
+        await writeFile();
+        state.settings.lastBackupAt = Date.now();
+        localStorage.setItem(LS_KEY, JSON.stringify(state));
+        updateSaveIndicator();
+      } catch (e) {
+        fileStatus = 'error';
+        renderFileStatus();
+        toast('Could not write the data file — click the file button to reconnect');
+      }
+    }, 800);
+  }
+
+  async function maybeLoadNewerFromFile() {
+    try {
+      const f = await fileHandle.getFile();
+      const data = JSON.parse(await f.text());
+      if (data && data.years && (data.modifiedAt || 0) > (state.modifiedAt || 0)) {
+        const ok = await confirmDialog({
+          title: 'Load newer data from file?',
+          message: 'Your connected data file "' + esc(fileHandle.name) + '" has newer changes than this browser (e.g. from another Mac). Load the file version? Cancel keeps the browser version and overwrites the file on the next change.',
+          confirmText: 'Load file version', danger: false,
+        });
+        if (ok) adoptState(data);
+      }
+    } catch (e) { /* unreadable / not ours — ignore */ }
+  }
+
+  async function initFile() {
+    renderFileStatus();
+    if (!fileSupported) return;
+    try {
+      const h = await idb.get('fileHandle');
+      if (!h) return;
+      fileHandle = h;
+      const perm = await h.queryPermission({ mode: 'readwrite' });
+      if (perm === 'granted') {
+        fileStatus = 'connected';
+        await maybeLoadNewerFromFile();
+      } else {
+        fileStatus = 'reconnect';
+      }
+    } catch (e) { fileStatus = 'none'; }
+    renderFileStatus();
+    updateSaveIndicator();
+  }
+
+  /* ---------------- Chart renderer ---------------- */
+  // cfg: { series: [{name, color(css var), points:[{x,y}], markers:'all'|'end'|[x..], area, dashed, endLabel}],
+  //        xFormat(x), yFormat(v), tooltipTitle(x), height }
+  function niceTicks(min, max, n) {
+    n = n || 5;
+    if (min === max) { max = min + 1; }
+    const span = max - min, step0 = span / n;
+    const mag = Math.pow(10, Math.floor(Math.log10(step0)));
+    const norm = step0 / mag;
+    const step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
+    const lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step;
+    const ticks = [];
+    for (let v = lo; v <= hi + step / 2; v += step) ticks.push(v);
+    return ticks;
+  }
+
+  function lineChart(container, cfg) {
+    const series = (cfg.series || []).filter(s => s.points && s.points.length);
+    if (!series.length) {
+      container.innerHTML = '<div class="empty-chart">' + (cfg.emptyText || 'No data yet') + '</div>';
+      return;
+    }
+    const W = 860, H = cfg.height || 330, padL = 66, padR = 46, padT = 16, padB = 30;
+    const xs = [...new Set(series.flatMap(s => s.points.map(p => p.x)))].sort((a, b) => a - b);
+    const xMin = xs[0], xMaxRaw = xs[xs.length - 1];
+    const xMax = xMaxRaw === xMin ? xMin + 1 : xMaxRaw;
+    const allY = series.flatMap(s => s.points.map(p => p.y))
+      .concat((cfg.bands || []).flatMap(b => b.lower.concat(b.upper).map(p => p.y)));
+    let yMin = Math.min(0, ...allY), yMax = Math.max(...allY);
+    if (yMax === yMin) yMax = yMin + 1;
+    const yTicks = niceTicks(yMin, yMax, 5);
+    yMin = yTicks[0]; yMax = yTicks[yTicks.length - 1];
+    const X = x => padL + (x - xMin) / (xMax - xMin) * (W - padL - padR);
+    const Y = y => padT + (1 - (y - yMin) / (yMax - yMin)) * (H - padT - padB);
+    const xF = cfg.xFormat || (x => String(x));
+    const yF = cfg.yFormat || fmtCompact;
+
+    let g = '';
+    // gridlines + y labels
+    yTicks.forEach(v => {
+      const y = Y(v);
+      g += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y + '" y2="' + y + '" stroke="var(--grid)" stroke-width="1"/>';
+      g += '<text x="' + (padL - 9) + '" y="' + (y + 4) + '" text-anchor="end" font-size="11.5" fill="var(--text-muted)" style="font-variant-numeric:tabular-nums">' + yF(v) + '</text>';
+    });
+    // baseline
+    g += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + Y(Math.max(yMin, 0)) + '" y2="' + Y(Math.max(yMin, 0)) + '" stroke="var(--baseline)" stroke-width="1"/>';
+    // x tick labels (~7)
+    const stepX = Math.max(1, Math.ceil(xs.length / 7));
+    xs.forEach((x, i) => {
+      if (i % stepX !== 0 && i !== xs.length - 1) return;
+      g += '<text x="' + X(x) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="11.5" fill="var(--text-muted)">' + esc(xF(x)) + '</text>';
+    });
+    // bands (behind the lines)
+    (cfg.bands || []).forEach(b => {
+      const lo = [...b.lower].sort((a, c) => a.x - c.x);
+      const up = [...b.upper].sort((a, c) => a.x - c.x);
+      if (!lo.length || !up.length) return;
+      const d = lo.map((p, i) => (i ? 'L' : 'M') + X(p.x).toFixed(1) + ' ' + Y(p.y).toFixed(1)).join(' ') +
+        [...up].reverse().map(p => ' L' + X(p.x).toFixed(1) + ' ' + Y(p.y).toFixed(1)).join('') + ' Z';
+      g += '<path d="' + d + '" fill="' + b.color + '" opacity="0.12" stroke="none"/>';
+    });
+    // series
+    series.forEach(s => {
+      const pts = [...s.points].sort((a, b) => a.x - b.x);
+      const d = pts.map((p, i) => (i ? 'L' : 'M') + X(p.x).toFixed(1) + ' ' + Y(p.y).toFixed(1)).join(' ');
+      if (s.area) {
+        const areaD = d + ' L' + X(pts[pts.length - 1].x).toFixed(1) + ' ' + Y(Math.max(yMin, 0)) + ' L' + X(pts[0].x).toFixed(1) + ' ' + Y(Math.max(yMin, 0)) + ' Z';
+        g += '<path d="' + areaD + '" fill="' + s.color + '" opacity="0.1" stroke="none"/>';
+      }
+      g += '<path d="' + d + '" fill="none" stroke="' + s.color + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"' + (s.dashed ? ' stroke-dasharray="5 5"' : '') + '/>';
+      let markXs = [];
+      if (s.markers === 'all') markXs = pts.map(p => p.x);
+      else if (s.markers === 'end') markXs = [pts[pts.length - 1].x];
+      else if (Array.isArray(s.markers)) markXs = s.markers;
+      markXs.forEach(mx => {
+        const p = pts.find(q => q.x === mx);
+        if (!p) return;
+        g += '<circle cx="' + X(p.x).toFixed(1) + '" cy="' + Y(p.y).toFixed(1) + '" r="4.5" fill="' + s.color + '" stroke="var(--surface-1)" stroke-width="2"/>';
+      });
+      if (s.endLabel) {
+        const p = pts[pts.length - 1];
+        g += '<text x="' + (X(p.x) + 8) + '" y="' + (Y(p.y) + 4) + '" font-size="11.5" font-weight="600" fill="var(--text-primary)" style="font-variant-numeric:tabular-nums">' + yF(p.y) + '</text>';
+      }
+    });
+    // hover layer
+    g += '<g class="hover-layer" style="display:none"><line class="hl-line" y1="' + padT + '" y2="' + (H - padB) + '" stroke="var(--baseline)" stroke-width="1"/>' +
+      series.map((s, i) => '<circle class="hl-dot" data-i="' + i + '" r="4.5" fill="' + s.color + '" stroke="var(--surface-1)" stroke-width="2"/>').join('') + '</g>';
+    g += '<rect class="hover-target" x="' + padL + '" y="' + padT + '" width="' + (W - padL - padR) + '" height="' + (H - padT - padB) + '" fill="transparent"/>';
+
+    let legend = '';
+    const legendSeries = series.filter(s => !s.hideLegend);
+    if (legendSeries.length >= 2) {
+      legend = '<div class="legend">' + legendSeries.map(s =>
+        '<span class="chip"><i style="background:' + s.color + '"></i>' + esc(s.name) + '</span>').join('') + '</div>';
+    }
+    container.innerHTML = legend +
+      '<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="chart">' + g + '</svg>' +
+      '<div class="tooltip"></div>';
+
+    // interactions
+    const svg = container.querySelector('svg');
+    const tip = container.querySelector('.tooltip');
+    const layer = container.querySelector('.hover-layer');
+    const hline = container.querySelector('.hl-line');
+    const dots = [...container.querySelectorAll('.hl-dot')];
+    const target = container.querySelector('.hover-target');
+
+    function onMove(e) {
+      const rect = svg.getBoundingClientRect();
+      const vx = (e.clientX - rect.left) / rect.width * W;
+      const dataX = xMin + (vx - padL) / (W - padL - padR) * (xMax - xMin);
+      let nearest = xs[0], best = Infinity;
+      xs.forEach(x => { const d = Math.abs(x - dataX); if (d < best) { best = d; nearest = x; } });
+      layer.style.display = '';
+      hline.setAttribute('x1', X(nearest)); hline.setAttribute('x2', X(nearest));
+      let rows = '';
+      series.forEach((s, i) => {
+        const p = s.points.find(q => q.x === nearest);
+        if (p) {
+          dots[i].style.display = '';
+          dots[i].setAttribute('cx', X(p.x)); dots[i].setAttribute('cy', Y(p.y));
+          rows += '<div class="tt-row"><span><i style="background:' + s.color + '"></i>' + esc(s.name) + '</span><b>' + (cfg.tooltipValue ? cfg.tooltipValue(p.y) : fmtMoney(p.y)) + '</b></div>';
+        } else {
+          dots[i].style.display = 'none';
+        }
+      });
+      tip.innerHTML = '<div class="tt-title">' + esc(cfg.tooltipTitle ? cfg.tooltipTitle(nearest) : xF(nearest)) + '</div>' + rows;
+      tip.style.display = 'block';
+      const px = X(nearest) / W * rect.width;
+      const tw = tip.offsetWidth || 160;
+      let left = px + 14;
+      if (left + tw > rect.width - 4) left = px - tw - 14;
+      tip.style.left = Math.max(4, left) + 'px';
+    }
+    function onLeave() { layer.style.display = 'none'; tip.style.display = 'none'; }
+    target.addEventListener('mousemove', onMove);
+    target.addEventListener('mouseleave', onLeave);
+  }
+
+  /* ---------------- Tab 1: Overview ---------------- */
+
+  function renderOverview() {
+    const rows = sortedRows();
+    const statsEl = document.getElementById('ov-stats');
+    const chipsEl = document.getElementById('ov-bench-chips');
+    const chartEl = document.getElementById('ov-chart');
+    const tableEl = document.getElementById('ov-table');
+
+    if (!rows.length && editingYear === null) {
+      statsEl.innerHTML = '';
+      chipsEl.innerHTML = '';
+      chartEl.innerHTML = '';
+      document.getElementById('ov-accounts').innerHTML = '';
+      tableEl.innerHTML =
+        '<div class="empty-state"><h3>No years tracked yet</h3>' +
+        '<p>Add your first year here, or enter per-account balances in the Data Entry tab.</p>' +
+        '<button class="btn btn-primary" onclick="App.addYear()">＋ Add your first year</button> ' +
+        '<button class="btn" onclick="App.loadSample()">Load sample data</button></div>';
+      renderBenchmarksEditor();
+      return;
+    }
+
+    // ---- stats ----
+    const totalDeposits = (rows[0] ? rows[0].start || 0 : 0) + rows.reduce((s, r) => s + (r.deposits || 0), 0);
+    const bal = currentBalance();
+    const earnings = bal - totalDeposits;
+    const irr = overallIRR(rows);
+    const sp = state.benchmarks[0];
+    let irrDelta = '';
+    if (irr != null && sp && rows.length) {
+      const bIRR = benchmarkIRR(rows, sp);
+      if (bIRR != null) {
+        const d = irr - bIRR;
+        irrDelta = '<div class="delta"><span class="' + (d >= 0 ? 'delta-up' : 'delta-down') + '">' + fmtPctSigned(d) + '</span> vs ' + esc(sp.name) + '</div>';
+      }
+    }
+    statsEl.innerHTML = '<div class="stats">' +
+      '<div class="stat hero"><div class="label">Current balance</div><div class="value">' + fmtMoney(bal) + '</div>' +
+      '<div class="delta">as of end of ' + (rows.length ? rows[rows.length - 1].year : '—') + '</div></div>' +
+      '<div class="stat"><div class="label">Total deposits</div><div class="value">' + fmtMoney(totalDeposits) + '</div>' +
+      '<div class="delta">incl. starting balance</div></div>' +
+      '<div class="stat"><div class="label">Total earnings</div><div class="value ' + (earnings >= 0 ? '' : '') + '">' + fmtMoney(earnings) + '</div>' +
+      '<div class="delta"><span class="' + (earnings >= 0 ? 'delta-up' : 'delta-down') + '">' + fmtPctSigned(totalDeposits > 0 ? earnings / totalDeposits : null) + '</span> on deposits</div></div>' +
+      '<div class="stat"><div class="label">Overall IRR (annualized)</div><div class="value">' + fmtPct(irr) + '</div>' + irrDelta + '</div>' +
+      '</div>';
+
+    // ---- benchmark chips (your IRR vs what each benchmark would have earned on your flows) ----
+    if (irr != null && state.benchmarks.length && rows.length) {
+      chipsEl.innerHTML = '<div class="bench-chips">' + state.benchmarks.slice(0, 4).map((b, i) => {
+        const bIRR = benchmarkIRR(rows, b);
+        if (bIRR == null) return '';
+        const d = irr - bIRR;
+        return '<span class="bench-chip"><i style="background:var(--series-' + (i + 2 <= 5 ? i + 2 : 5) + ')"></i>' +
+          esc(b.name) + ' ' + fmtPct(bIRR) + '/yr — you: <b class="' + (d >= 0 ? 'pos' : 'neg') + '">' + fmtPctSigned(d) + '</b></span>';
+      }).join('') + '</div>';
+    } else {
+      chipsEl.innerHTML = '';
+    }
+
+    // ---- chart ----
+    if (rows.length) {
+      const y0 = rows[0].year - 1;
+      const actualPts = [{ x: y0, y: rows[0].start || 0 }].concat(rows.map(r => ({ x: r.year, y: r.ending || 0 })));
+      const series = [{
+        name: 'Your portfolio', color: 'var(--series-1)', points: actualPts,
+        markers: 'all', area: true, endLabel: rows.length >= 2,
+      }];
+      state.benchmarks.slice(0, 4).forEach((b, i) => {
+        series.push({
+          name: b.name + (b.series && b.series !== 'flat' ? ' — actual' : ' (' + b.rate.toFixed(1) + '%)'),
+          color: 'var(--series-' + (i + 2) + ')',
+          points: simulatePath(rows, b),
+        });
+      });
+      lineChart(chartEl, {
+        series: series,
+        xFormat: x => x === y0 ? 'Start' : String(x),
+        tooltipTitle: x => x === y0 ? 'Starting point' : 'End of ' + x,
+      });
+    } else {
+      chartEl.innerHTML = '<div class="empty-chart">Add a year to see the chart</div>';
+    }
+
+    // ---- table ----
+    let html = '<table class="data"><thead><tr>' +
+      '<th>Year</th><th>Starting balance</th><th>Deposits</th><th>Ending balance</th>' +
+      '<th>Gain / loss</th><th title="Assumes deposits spread evenly through the year">Annual IRR</th><th></th>' +
+      '</tr></thead><tbody>';
+
+    rows.forEach(r => {
+      const gain = (r.ending || 0) - (r.start || 0) - (r.deposits || 0);
+      const irrY = yearIRR(r.start || 0, r.deposits || 0, r.ending || 0);
+      const fromAccounts = r.entries && Object.keys(r.entries).length > 0;
+      if (editingYear === r.year) {
+        html += '<tr data-year="' + r.year + '">' +
+          '<td><b>' + r.year + '</b><br><input class="cell-input" id="ed-note" style="width:130px;text-align:left;font-size:11.5px;margin-top:4px" placeholder="note" value="' + esc(r.note || '') + '" onkeydown="if(event.key===\'Enter\')App.saveEdit(' + r.year + ')"></td>' +
+          '<td><input class="cell-input" id="ed-start" value="' + Math.round(r.start || 0) + '" onkeydown="if(event.key===\'Enter\')App.saveEdit(' + r.year + ')"></td>' +
+          '<td><input class="cell-input" id="ed-dep" value="' + Math.round(r.deposits || 0) + '" onkeydown="if(event.key===\'Enter\')App.saveEdit(' + r.year + ')"></td>' +
+          '<td><input class="cell-input" id="ed-end" value="' + Math.round(r.ending || 0) + '" onkeydown="if(event.key===\'Enter\')App.saveEdit(' + r.year + ')"></td>' +
+          '<td class="' + (gain >= 0 ? 'pos' : 'neg') + '">' + fmtMoneySigned(gain) + '</td>' +
+          '<td>' + fmtPct(irrY) + '</td>' +
+          '<td class="actions">' +
+          iconBtn('check', 'Save', 'App.saveEdit(' + r.year + ')') +
+          iconBtn('x', 'Cancel', 'App.cancelEdit()') +
+          '</td></tr>';
+      } else {
+        html += '<tr data-year="' + r.year + '">' +
+          '<td><b>' + r.year + '</b>' + (fromAccounts ? '<span class="badge" title="Totals come from per-account Data Entry">accounts</span>' : '') +
+          (r.note ? '<div class="note-line" title="' + esc(r.note) + '">' + esc(r.note) + '</div>' : '') + '</td>' +
+          '<td>' + fmtMoney(r.start) + '</td>' +
+          '<td>' + fmtMoney(r.deposits) + '</td>' +
+          '<td>' + fmtMoney(r.ending) + '</td>' +
+          '<td class="' + (gain >= 0 ? 'pos' : 'neg') + '">' + fmtMoneySigned(gain) + '</td>' +
+          '<td class="' + (irrY == null ? '' : irrY >= 0 ? 'pos' : 'neg') + '">' + fmtPct(irrY) + '</td>' +
+          '<td class="actions">' +
+          iconBtn(r.locked ? 'lock' : 'unlock', r.locked ? 'Locked — click to unlock' : 'Unlocked — click to lock', 'App.toggleLock(' + r.year + ')', { cls: r.locked ? 'locked' : '' }) +
+          iconBtn('edit', r.locked ? 'Unlock to edit' : 'Edit', 'App.editYear(' + r.year + ')', { disabled: r.locked }) +
+          iconBtn('trash', r.locked ? 'Unlock to delete' : 'Delete', 'App.deleteYear(' + r.year + ')', { disabled: r.locked }) +
+          '</td></tr>';
+      }
+    });
+
+    if (rows.length) {
+      const totDep = rows.reduce((s, r) => s + (r.deposits || 0), 0);
+      const totGain = rows.reduce((s, r) => s + ((r.ending || 0) - (r.start || 0) - (r.deposits || 0)), 0);
+      html += '</tbody><tfoot><tr><td>Total</td><td></td><td>' + fmtMoney(totDep) + '</td><td>' + fmtMoney(currentBalance()) + '</td>' +
+        '<td class="' + (totGain >= 0 ? 'pos' : 'neg') + '">' + fmtMoneySigned(totGain) + '</td><td>' + fmtPct(overallIRR(rows)) + '</td><td></td></tr></tfoot>';
+    } else {
+      html += '</tbody>';
+    }
+    html += '</table>';
+    tableEl.innerHTML = html;
+    const inp = document.getElementById('ed-start');
+    if (inp) inp.focus();
+
+    renderAccountsCard();
+    renderBenchmarksEditor();
+  }
+
+  /* ---- Per-account analytics (Overview) ---- */
+
+  function accountStats() {
+    const rows = sortedRows().filter(r => r.entries && Object.keys(r.entries).length);
+    if (!rows.length) return null;
+    const latest = rows[rows.length - 1];
+    const stats = state.accounts.map(a => {
+      const yrs = rows.filter(r => r.entries[a.id]);
+      if (!yrs.length) return null;
+      const inLatest = !!latest.entries[a.id];
+      const cur = inLatest ? (latest.entries[a.id].end || 0) : (yrs[yrs.length - 1].entries[a.id].end || 0);
+      const dep = yrs.reduce((s, r) => s + (r.entries[a.id].dep || 0), 0);
+      // IRR measured from the end of the first tracked year (start value = that year-end balance)
+      let irr = null;
+      if (yrs.length >= 2) {
+        const y1 = yrs[0].year;
+        const flows = [{ t: 0, amt: -(yrs[0].entries[a.id].end || 0) }];
+        yrs.slice(1).forEach(r => { if (r.entries[a.id].dep) flows.push({ t: (r.year - y1) - 0.5, amt: -r.entries[a.id].dep }); });
+        flows.push({ t: yrs[yrs.length - 1].year - y1, amt: yrs[yrs.length - 1].entries[a.id].end || 0 });
+        irr = bisect(r => flows.reduce((s, c) => s + c.amt * Math.pow(1 + r, -c.t), 0), -0.999999, 20);
+      }
+      return { a: a, cur: cur, dep: dep, irr: irr, first: yrs[0].year,
+               series: yrs.map(r => ({ x: r.year, y: r.entries[a.id].end || 0 })) };
+    }).filter(Boolean);
+    stats.sort((x, y) => y.cur - x.cur);
+    return { stats: stats, years: rows.length, latestYear: latest.year };
+  }
+
+  function renderAccountsCard() {
+    const el = document.getElementById('ov-accounts');
+    const acc = accountStats();
+    if (!acc || !acc.stats.length) { el.innerHTML = ''; return; }
+    const total = acc.stats.reduce((s, x) => s + x.cur, 0) || 1;
+
+    // allocation bar + legend: first 4 accounts by size get slots 1–4, the rest fold into "Other" (gray)
+    const top = acc.stats.slice(0, 4);
+    const other = acc.stats.slice(4);
+    const segs = top.map((x, i) => ({ name: x.a.name, val: x.cur, color: 'var(--series-' + (i + 1) + ')' }));
+    if (other.length) segs.push({ name: 'Other', val: other.reduce((s, x) => s + x.cur, 0), color: 'var(--baseline)' });
+    const bar = '<div class="alloc-bar">' + segs.map(s =>
+      '<i style="flex:0 0 ' + (100 * s.val / total).toFixed(2) + '%;background:' + s.color + '" title="' + esc(s.name) + ' ' + fmtMoney(s.val) + '"></i>').join('') + '</div>' +
+      '<div class="legend">' + segs.map(s =>
+        '<span class="chip"><i style="background:' + s.color + '"></i>' + esc(s.name) + ' <b style="color:var(--text-primary)">' + (100 * s.val / total).toFixed(0) + '%</b></span>').join('') + '</div>';
+
+    let table = '<div class="table-scroll" style="margin-top:12px"><table class="data"><thead><tr>' +
+      '<th>Account</th><th>Balance (' + acc.latestYear + ')</th><th>Share</th><th>Deposits tracked</th><th title="Money-weighted, measured from the end of the first tracked year">IRR</th></tr></thead><tbody>' +
+      acc.stats.map(x =>
+        '<tr><td>' + esc(x.a.name) + '</td><td>' + fmtMoney(x.cur) + '</td><td>' + (100 * x.cur / total).toFixed(1) + '%</td>' +
+        '<td>' + fmtMoney(x.dep) + '</td><td class="' + (x.irr == null ? '' : x.irr >= 0 ? 'pos' : 'neg') + '">' +
+        (x.irr == null ? '—' : fmtPct(x.irr) + '<span class="note-line" style="display:inline;margin-left:5px">since ' + x.first + '</span>') + '</td></tr>').join('') +
+      '</tbody></table></div>';
+
+    const chartBlock = acc.years >= 2
+      ? '<h2 style="margin-top:20px">Account growth</h2><div id="ov-acc-chart" class="chart"></div>'
+      : '';
+
+    el.innerHTML = '<div class="card"><div class="card-head"><div><h2>By account</h2>' +
+      '<p class="card-sub">Allocation and per-account performance from your Data Entry history</p></div></div>' +
+      bar + table + chartBlock + '</div>';
+
+    if (acc.years >= 2) {
+      const series = top.map((x, i) => ({
+        name: x.a.name, color: 'var(--series-' + (i + 1) + ')', points: x.series, markers: 'all',
+      }));
+      if (other.length) {
+        const byYear = {};
+        other.forEach(x => x.series.forEach(p => { byYear[p.x] = (byYear[p.x] || 0) + p.y; }));
+        series.push({ name: 'Other', color: 'var(--baseline)',
+          points: Object.keys(byYear).map(y => ({ x: +y, y: byYear[y] })), markers: 'all' });
+      }
+      lineChart(document.getElementById('ov-acc-chart'), {
+        series: series, height: 280,
+        xFormat: x => String(x),
+        tooltipTitle: x => 'End of ' + x,
+      });
+    }
+  }
+
+  function renderBenchmarksEditor() {
+    const el = document.getElementById('ov-benchmarks');
+    if (!state.benchmarks.length) {
+      el.innerHTML = '<p class="note">No benchmarks. Add one to enable comparisons.</p>';
+      return;
+    }
+    let html = '<table class="data"><thead><tr><th>Benchmark</th><th>Returns used</th><th>Flat / fallback rate</th><th></th></tr></thead><tbody>';
+    state.benchmarks.forEach((b, i) => {
+      html += '<tr><td style="width:40%"><input class="cell-input" style="width:95%;text-align:left" value="' + esc(b.name) + '" onchange="App.updateBenchmark(' + i + ',\'name\',this.value)"></td>' +
+        '<td><select class="cell-input" style="width:170px;text-align:left" onchange="App.updateBenchmark(' + i + ',\'series\',this.value)">' +
+        Object.keys(SERIES_LABELS).map(k => '<option value="' + k + '"' + ((b.series || 'flat') === k ? ' selected' : '') + '>' + SERIES_LABELS[k] + '</option>').join('') +
+        '</select></td>' +
+        '<td><input class="cell-input" style="width:70px" value="' + b.rate + '" onchange="App.updateBenchmark(' + i + ',\'rate\',this.value)"> %</td>' +
+        '<td class="actions">' + iconBtn('trash', 'Remove benchmark', 'App.deleteBenchmark(' + i + ')') + '</td></tr>';
+    });
+    html += '</tbody></table><p class="note" style="margin-top:8px">"Actual" series use real calendar-year total returns for 2000–2025 (2025 approximate), so the benchmark lives through the same crash years you did; the flat rate fills years outside that range. 60/40 = 60% S&amp;P 500 + 40% bonds, rebalanced yearly. Only the first 4 benchmarks are drawn on the chart.</p>';
+    el.innerHTML = html;
+  }
+
+  /* ---------------- Tab 2: Data entry ---------------- */
+
+  function renderEntry() {
+    // accounts list
+    const accEl = document.getElementById('en-accounts');
+    if (!state.accounts.length) {
+      accEl.innerHTML = '<p class="note">No accounts yet — add your first below.</p>';
+    } else {
+      accEl.innerHTML = state.accounts.map(a =>
+        '<div class="account-row" data-id="' + esc(a.id) + '">' +
+        '<span class="name">' + esc(a.name) + '</span>' +
+        iconBtn('edit', 'Rename account', 'App.renameAccount(\'' + a.id + '\')') +
+        iconBtn('trash', 'Delete account', 'App.deleteAccount(\'' + a.id + '\')') +
+        '</div>').join('');
+    }
+
+    // year select
+    const sel = document.getElementById('en-year-select');
+    const years = Object.keys(state.years).map(Number).sort((a, b) => b - a);
+    if (entryYear == null && years.length) entryYear = years[0];
+    sel.innerHTML = years.map(y => '<option value="' + y + '"' + (y === entryYear ? ' selected' : '') + '>' + y + '</option>').join('') +
+      '<option value="__new__">＋ Add new year…</option>';
+    if (!years.length) sel.value = '__new__';
+
+    renderEntryGrid();
+  }
+
+  function renderEntryGrid() {
+    const el = document.getElementById('en-grid');
+    if (!state.accounts.length) {
+      el.innerHTML = '<div class="empty-state"><h3>Add accounts first</h3><p>Once accounts exist, you can enter each one\'s deposits and year-end balance here.</p></div>';
+      return;
+    }
+    if (entryYear == null || !state.years[entryYear]) {
+      el.innerHTML = '<div class="empty-state"><h3>No year selected</h3><p>Pick a year above, or add a new one.</p>' +
+        '<button class="btn btn-primary" onclick="App.entryAddYear()">＋ Add year</button></div>';
+      return;
+    }
+    const yr = state.years[entryYear];
+    const rows = sortedRows();
+    const prev = rows.filter(r => r.year < entryYear).pop();
+    const entries = yr.entries || {};
+    const locked = !!yr.locked;
+
+    let html = '';
+    if (locked) {
+      html += '<div class="lock-banner">' + ICONS.lock + ' <span><b>' + entryYear + ' is locked.</b> Unlock it (button below, or in the Overview tab) to make changes.</span></div>';
+    }
+    html += '<div class="inline-form" style="margin-bottom:14px">' +
+      '<div class="field"><label for="en-start">Starting balance for ' + entryYear + ' ($)</label>' +
+      '<input id="en-start" style="max-width:180px" value="' + Math.round(yr.start || 0) + '"' + (locked ? ' disabled' : '') + '>' +
+      '<span class="hint">' + (prev ? 'auto-filled from ' + prev.year + ' ending balance' : 'your balance at the start of ' + entryYear) + '</span></div>' +
+      '</div>';
+
+    html += '<div class="table-scroll"><table class="data"><thead><tr><th>Account</th><th>Deposits in ' + entryYear + '</th><th>Ending balance</th></tr></thead><tbody>';
+    state.accounts.forEach(a => {
+      const e = entries[a.id] || { dep: '', end: '' };
+      html += '<tr><td>' + esc(a.name) + '</td>' +
+        '<td><input class="cell-input en-dep" data-id="' + esc(a.id) + '" value="' + (e.dep === '' ? '' : Math.round(e.dep)) + '" placeholder="0"' + (locked ? ' disabled' : '') + '></td>' +
+        '<td><input class="cell-input en-end" data-id="' + esc(a.id) + '" value="' + (e.end === '' ? '' : Math.round(e.end)) + '" placeholder="0"' + (locked ? ' disabled' : '') + '></td></tr>';
+    });
+    html += '</tbody><tfoot><tr><td>Total</td><td id="en-tot-dep">—</td><td id="en-tot-end">—</td></tr></tfoot></table></div>';
+
+    html += '<div class="inline-form" style="margin-top:16px;justify-content:space-between;width:100%">' +
+      '<div style="display:flex;gap:8px">' +
+      '<button class="btn btn-primary" onclick="App.saveEntry()"' + (locked ? ' disabled style="opacity:.5;cursor:not-allowed"' : '') + '>Save → updates Overview</button>' +
+      '<button class="btn" onclick="App.toggleLock(' + entryYear + ')">' + (locked ? 'Unlock ' + entryYear : 'Lock ' + entryYear) + '</button>' +
+      '</div>' +
+      '<span class="note" id="en-sync-note"></span></div>';
+
+    el.innerHTML = html;
+    el.querySelectorAll('.en-dep, .en-end').forEach(i => i.addEventListener('input', updateEntryTotals));
+    updateEntryTotals();
+  }
+
+  function updateEntryTotals() {
+    const el = document.getElementById('en-grid');
+    if (!el) return;
+    let dep = 0, end = 0;
+    el.querySelectorAll('.en-dep').forEach(i => dep += parseNum(i.value));
+    el.querySelectorAll('.en-end').forEach(i => end += parseNum(i.value));
+    const td = document.getElementById('en-tot-dep'), te = document.getElementById('en-tot-end');
+    if (td) td.textContent = fmtMoney(dep);
+    if (te) te.textContent = fmtMoney(end);
+  }
+
+  /* ---------------- Tab 3: Analysis ---------------- */
+
+  function analysisParams() {
+    const a = state.settings.analysis;
+    const start = a.start == null ? currentBalance() : a.start;
+    return {
+      start: start,
+      ret: (a.ret || 0) / 100,
+      dep: a.dep || 0,
+      depGrowth: (a.depGrowth || 0) / 100,
+      infl: (a.infl || 0) / 100,
+      target: a.target || 0,
+      depUntil: a.depUntil == null ? MAX_HORIZON : a.depUntil,
+      wd: a.wd || 0,
+      vol: (a.vol || 0) / 100,
+      mc: !!a.mc,
+    };
+  }
+
+  function renderAnalysis() {
+    const a = state.settings.analysis;
+    const p = analysisParams();
+    // fill inputs (don't clobber while user is typing in one)
+    const set = (id, v) => {
+      const el = document.getElementById(id);
+      if (el && document.activeElement !== el) el.value = v;
+    };
+    set('an-start', Math.round(p.start));
+    set('an-ret', a.ret);
+    set('an-dep', a.dep);
+    set('an-depg', a.depGrowth);
+    set('an-infl', a.infl);
+    set('an-target', a.target);
+    set('an-depyrs', a.depUntil == null ? MAX_HORIZON : a.depUntil);
+    set('an-wd', a.wd || 0);
+    set('an-vol', a.vol);
+    document.getElementById('an-mc').checked = !!a.mc;
+    document.getElementById('an-use-current').textContent = 'Use current balance (' + fmtCompact(currentBalance()) + ')';
+
+    const pts = project(p, MAX_HORIZON);
+    const nowYear = new Date().getFullYear();
+
+    // result cards
+    const resEl = document.getElementById('an-results');
+    resEl.innerHTML = '<div class="stats">' + HORIZONS.map(h => {
+      const pt = pts[h];
+      const growth = pt.bal - pt.contrib;
+      const real = pt.bal / Math.pow(1 + p.infl, h);
+      return '<div class="stat"><div class="label">In ' + h + ' years (' + (nowYear + h) + ')</div>' +
+        '<div class="value">' + fmtCompact(pt.bal) + '</div>' +
+        '<div class="delta">' + fmtCompact(pt.contrib) + ' contributed · <span class="' + (growth >= 0 ? 'delta-up' : 'delta-down') + '">' + fmtCompact(growth) + ' growth</span></div>' +
+        '<div class="delta">≈ ' + fmtCompact(real) + ' in today\'s dollars</div></div>';
+    }).join('') + '</div>';
+
+    // milestone / depletion
+    const msEl = document.getElementById('an-milestone');
+    if (pts.depleted != null) {
+      msEl.innerHTML = '<span class="neg">Money runs out in year ' + pts.depleted + ' (' + (nowYear + pts.depleted) + ') on these assumptions.</span>';
+    } else if (p.target > 0) {
+      const hit = pts.find(pt => pt.bal >= p.target);
+      msEl.textContent = hit
+        ? (hit.i === 0 ? 'You\'re already past ' + fmtCompact(p.target) + '.'
+          : 'You\'d cross ' + fmtCompact(p.target) + ' in year ' + hit.i + ' (' + (nowYear + hit.i) + ').')
+        : 'The ' + fmtCompact(p.target) + ' target isn\'t reached within 30 years on these assumptions.';
+    } else {
+      msEl.textContent = 'Balance vs. total contributed, on the assumptions above';
+    }
+
+    // chart (+ optional Monte Carlo band)
+    const series = [
+      { name: 'Projected balance', color: 'var(--series-1)', points: pts.map(q => ({ x: q.i, y: q.bal })), area: true, markers: HORIZONS, endLabel: true },
+      { name: 'Total contributed', color: 'var(--series-2)', points: pts.map(q => ({ x: q.i, y: q.contrib })) },
+    ];
+    const bands = [];
+    if (p.mc && p.vol > 0) {
+      const mc = mcSimulate(p, MAX_HORIZON, 400);
+      series.push({ name: 'Median (Monte Carlo)', color: 'var(--series-5)', dashed: true,
+        points: mc.map((q, i) => ({ x: i, y: q.p50 })) });
+      series.push({ name: '10th percentile', color: 'var(--series-5)', hideLegend: true, dashed: true,
+        points: mc.map((q, i) => ({ x: i, y: q.p10 })) });
+      series.push({ name: '90th percentile', color: 'var(--series-5)', hideLegend: true, dashed: true,
+        points: mc.map((q, i) => ({ x: i, y: q.p90 })) });
+      bands.push({ color: 'var(--series-5)',
+        lower: mc.map((q, i) => ({ x: i, y: q.p10 })),
+        upper: mc.map((q, i) => ({ x: i, y: q.p90 })) });
+    }
+    lineChart(document.getElementById('an-chart'), {
+      series: series,
+      bands: bands,
+      xFormat: x => x === 0 ? 'Now' : '+' + x + 'y',
+      tooltipTitle: x => x === 0 ? 'Today' : 'Year ' + x + ' (' + (nowYear + x) + ')',
+    });
+
+    renderSensitivity(p);
+  }
+
+  function renderSensitivity(p) {
+    const el = document.getElementById('an-sens');
+    const rets = [5, 6, 7, 8, 9];
+    const mults = [0.5, 0.75, 1, 1.25, 1.5];
+    const curRet = p.ret * 100;
+    const hotCol = rets.reduce((best, r, i) => Math.abs(r - curRet) < Math.abs(rets[best] - curRet) ? i : best, 0);
+    let html = '<table class="data"><thead><tr><th>Deposits \\ Return</th>' +
+      rets.map(r => '<th>' + r + '%/yr</th>').join('') + '</tr></thead><tbody>';
+    mults.forEach(m => {
+      const dep = Math.round(p.dep * m);
+      const hotRow = m === 1;
+      html += '<tr><td>' + fmtCompact(dep) + '/yr</td>' + rets.map((r, i) => {
+        const pts = project({ ...p, ret: r / 100, dep: dep }, MAX_HORIZON);
+        const hot = hotRow && i === hotCol;
+        return '<td class="' + (hot ? 'sens-hot' : '') + '">' + fmtCompact(pts[MAX_HORIZON].bal) + '</td>';
+      }).join('') + '</tr>';
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  }
+
+  /* ---------------- Tab 4: Scenarios ---------------- */
+
+  function scenarioProject(s) {
+    return project({
+      start: s.start, ret: s.ret / 100, dep: s.dep, depGrowth: (s.depGrowth || 0) / 100,
+      infl: (s.infl || 0) / 100, depUntil: s.depUntil == null ? MAX_HORIZON : s.depUntil, wd: s.wd || 0,
+    }, MAX_HORIZON);
+  }
+
+  function renderScenarios() {
+    const listEl = document.getElementById('sc-list');
+    const chipsEl = document.getElementById('sc-compare-chips');
+
+    if (!state.scenarios.length) {
+      listEl.innerHTML = '<div class="empty-state"><h3>No saved scenarios</h3><p>Build a projection in the Analysis tab and hit "Save scenario". It will show up here for future reference.</p>' +
+        '<button class="btn" onclick="App.showTab(\'analysis\')">Go to Analysis</button></div>';
+      chipsEl.innerHTML = '';
+      document.getElementById('sc-compare').innerHTML = '';
+      return;
+    }
+
+    listEl.innerHTML = '<div class="scenario-grid">' + state.scenarios.map(s => {
+      const pts = scenarioProject(s);
+      return '<div class="scenario-card">' +
+        '<h3>' + esc(s.name) + (s.locked ? '<span class="badge">locked</span>' : '') + '</h3>' +
+        '<div class="meta">saved ' + esc(s.created) + ' · base year ' + s.baseYear + '</div>' +
+        '<div class="meta" style="margin-top:-6px">' + fmtCompact(s.start) + ' start · ' + s.ret + '%/yr · ' + fmtCompact(s.dep) + '/yr deposits' +
+        (s.depGrowth ? ' (+' + s.depGrowth + '%/yr)' : '') +
+        (s.wd > 0 ? ' · withdraws ' + fmtCompact(s.wd) + '/yr after yr ' + s.depUntil : '') + '</div>' +
+        (s.note ? '<div class="meta" style="margin-top:-4px">“' + esc(s.note) + '”</div>' : '') +
+        '<table>' + HORIZONS.map(h =>
+          '<tr><td>In ' + h + ' yrs (' + (s.baseYear + h) + ')</td><td>' + fmtCompact(pts[h].bal) + '</td></tr>').join('') + '</table>' +
+        (pts.depleted != null ? '<div class="meta neg" style="margin-top:6px">depletes in year ' + pts.depleted + '</div>' : '') +
+        '<div class="sc-actions">' +
+        iconBtn(s.locked ? 'lock' : 'unlock', s.locked ? 'Locked — click to unlock' : 'Unlocked — click to lock', 'App.toggleScenarioLock(\'' + s.id + '\')', { cls: s.locked ? 'locked' : '' }) +
+        iconBtn('trash', s.locked ? 'Unlock to delete' : 'Delete scenario', 'App.deleteScenario(\'' + s.id + '\')', { disabled: s.locked }) +
+        '</div></div>';
+    }).join('') + '</div>';
+
+    // compare chips (multi-select, max 3)
+    let ids = (state.settings.compareIds || []).filter(id => state.scenarios.some(s => s.id === id));
+    if (!ids.length) ids = [state.scenarios[0].id];
+    state.settings.compareIds = ids;
+    chipsEl.innerHTML = state.scenarios.map(s =>
+      '<button class="chip-toggle' + (ids.includes(s.id) ? ' on' : '') + '" onclick="App.toggleCompare(\'' + s.id + '\')">' + esc(s.name) + '</button>').join('');
+    renderCompare();
+  }
+
+  function renderCompare() {
+    const el = document.getElementById('sc-compare');
+    const sel = (state.settings.compareIds || []).map(id => state.scenarios.find(x => x.id === id)).filter(Boolean);
+    if (!sel.length) { el.innerHTML = ''; return; }
+
+    const allRows = sortedRows();
+    const minBase = Math.min(...sel.map(s => s.baseYear));
+    const rows = allRows.filter(r => r.year >= minBase - 1);
+    const actualPts = rows.map(r => ({ x: r.year, y: r.ending || 0 }));
+    const lastActual = actualPts.length ? actualPts[actualPts.length - 1].x : minBase;
+    const windowEnd = Math.max(lastActual + 2, minBase + 10);
+
+    const slots = [2, 3, 5];
+    const series = [{ name: 'Actual', color: 'var(--series-1)', points: actualPts, markers: 'all' }];
+    sel.forEach((s, i) => {
+      const pts = scenarioProject(s);
+      series.push({
+        name: 'Expected — ' + s.name, color: 'var(--series-' + slots[i] + ')', dashed: true,
+        points: pts.map(q => ({ x: s.baseYear - 1 + q.i, y: q.bal })).filter(p => p.x <= windowEnd),
+      });
+    });
+
+    // table tracks the first selected scenario
+    const s0 = sel[0];
+    const pts0 = scenarioProject(s0);
+    const overlapYears = allRows.filter(r => r.year >= s0.baseYear).map(r => r.year);
+    let tableHtml = '';
+    if (overlapYears.length) {
+      tableHtml = '<div class="table-scroll" style="margin-top:14px"><table class="data"><thead><tr>' +
+        '<th>Year</th><th>Expected — ' + esc(s0.name) + '</th><th>Actual</th><th>Difference</th><th>%</th></tr></thead><tbody>' +
+        overlapYears.map(y => {
+          const exp = pts0[y - s0.baseYear + 1] ? pts0[y - s0.baseYear + 1].bal : null;
+          const act = state.years[y].ending || 0;
+          const diff = exp == null ? null : act - exp;
+          const pct = exp ? diff / exp : null;
+          return '<tr><td><b>' + y + '</b></td><td>' + fmtMoney(exp) + '</td><td>' + fmtMoney(act) + '</td>' +
+            '<td class="' + (diff >= 0 ? 'pos' : 'neg') + '">' + fmtMoneySigned(diff) + '</td>' +
+            '<td class="' + (pct >= 0 ? 'pos' : 'neg') + '">' + fmtPctSigned(pct) + '</td></tr>';
+        }).join('') + '</tbody></table>' +
+        (sel.length > 1 ? '<p class="note" style="margin-top:6px">The table tracks the first selected scenario; the chart overlays all selected.</p>' : '') + '</div>';
+    } else {
+      tableHtml = '<p class="note" style="margin-top:12px">No overlapping actual years yet — once you record year-end results for ' + s0.baseYear + ' or later, they\'ll be compared here.</p>';
+    }
+
+    el.innerHTML = '<div class="chart" id="sc-compare-chart"></div>' + tableHtml;
+    lineChart(document.getElementById('sc-compare-chart'), {
+      series: series,
+      xFormat: x => String(x),
+      tooltipTitle: x => 'End of ' + x,
+      emptyText: 'No data to compare yet',
+      height: 300,
+    });
+  }
+
+  /* ---------------- Actions (exposed) ---------------- */
+
+  const App = {
+
+    /* --- tabs --- */
+    showTab(name) {
+      currentTab = name;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+      renderAll();
+    },
+
+    /* --- theme --- */
+    cycleTheme() {
+      const order = ['auto', 'light', 'dark'];
+      const cur = state.settings.theme || 'auto';
+      state.settings.theme = order[(order.indexOf(cur) + 1) % order.length];
+      applyTheme();
+      save();
+      renderAll();
+    },
+
+    /* --- overview: years --- */
+    addYear() {
+      const rows = sortedRows();
+      let y = rows.length ? rows[rows.length - 1].year + 1 : new Date().getFullYear() - 1;
+      while (state.years[y]) y++;
+      const prevEnd = rows.length ? rows[rows.length - 1].ending || 0 : 0;
+      state.years[y] = { start: prevEnd, deposits: 0, ending: prevEnd, locked: false, entries: null };
+      editingYear = y;
+      save();
+      if (currentTab !== 'overview') App.showTab('overview'); else renderAll();
+    },
+
+    editYear(y) {
+      if (state.years[y] && state.years[y].locked) return;
+      editingYear = y;
+      renderAll();
+    },
+
+    cancelEdit() { editingYear = null; renderAll(); },
+
+    saveEdit(y) {
+      const yr = state.years[y];
+      if (!yr) return;
+      yr.start = parseNum(document.getElementById('ed-start').value);
+      yr.deposits = parseNum(document.getElementById('ed-dep').value);
+      yr.ending = parseNum(document.getElementById('ed-end').value);
+      yr.note = (document.getElementById('ed-note').value || '').trim();
+      editingYear = null;
+      save();
+      renderAll();
+      toast(y + ' updated');
+    },
+
+    async deleteYear(y) {
+      const yr = state.years[y];
+      if (!yr || yr.locked) return;
+      const ok = await confirmDialog({
+        title: 'Delete ' + y + '?',
+        message: 'This removes the ' + y + ' row (ending balance ' + fmtMoney(yr.ending) + ') and its per-account entries. This cannot be undone.',
+        confirmText: 'Delete year', danger: true,
+      });
+      if (!ok) return;
+      delete state.years[y];
+      if (entryYear === y) entryYear = null;
+      save(); renderAll();
+      toast(y + ' deleted');
+    },
+
+    async toggleLock(y) {
+      const yr = state.years[y];
+      if (!yr) return;
+      if (yr.locked) {
+        const ok = await confirmDialog({
+          title: 'Unlock ' + y + '?',
+          message: 'Unlocking allows this year to be edited or deleted. Lock it again when you\'re done.',
+          confirmText: 'Unlock', danger: false,
+        });
+        if (!ok) return;
+        yr.locked = false;
+        toast(y + ' unlocked');
+      } else {
+        yr.locked = true;
+        if (editingYear === y) editingYear = null;
+        toast(y + ' locked');
+      }
+      save(); renderAll();
+    },
+
+    /* --- overview: benchmarks --- */
+    addBenchmark() {
+      state.benchmarks.push({ name: 'New benchmark', rate: 5.0 });
+      save(); renderAll();
+    },
+    updateBenchmark(i, field, val) {
+      if (!state.benchmarks[i]) return;
+      if (field === 'rate') state.benchmarks[i].rate = parseNum(val);
+      else if (field === 'series') state.benchmarks[i].series = SERIES_LABELS[val] ? val : 'flat';
+      else state.benchmarks[i].name = String(val).trim() || 'Benchmark';
+      save(); renderAll();
+    },
+    async deleteBenchmark(i) {
+      const b = state.benchmarks[i];
+      if (!b) return;
+      const ok = await confirmDialog({
+        title: 'Remove benchmark?',
+        message: 'Remove "' + esc(b.name) + '" from comparisons?',
+        confirmText: 'Remove', danger: true,
+      });
+      if (!ok) return;
+      state.benchmarks.splice(i, 1);
+      save(); renderAll();
+    },
+
+    /* --- data entry --- */
+    addAccount() {
+      const inp = document.getElementById('en-new-account');
+      const name = inp.value.trim();
+      if (!name) { inp.focus(); return; }
+      state.accounts.push({ id: 'a' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), name: name });
+      inp.value = '';
+      save(); renderAll();
+      toast('Account added');
+    },
+
+    async renameAccount(id) {
+      const acc = state.accounts.find(a => a.id === id);
+      if (!acc) return;
+      const row = document.querySelector('.account-row[data-id="' + id + '"]');
+      if (!row) return;
+      row.innerHTML = '<input value="' + esc(acc.name) + '" id="ren-' + id + '">' +
+        iconBtn('check', 'Save name', 'App.renameAccountSave(\'' + id + '\')') +
+        iconBtn('x', 'Cancel', 'App.renderAll()');
+      const inp = document.getElementById('ren-' + id);
+      inp.focus(); inp.select();
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') App.renameAccountSave(id); });
+    },
+    renameAccountSave(id) {
+      const acc = state.accounts.find(a => a.id === id);
+      const inp = document.getElementById('ren-' + id);
+      if (acc && inp && inp.value.trim()) acc.name = inp.value.trim();
+      save(); renderAll();
+    },
+
+    async deleteAccount(id) {
+      const acc = state.accounts.find(a => a.id === id);
+      if (!acc) return;
+      const usedYears = Object.keys(state.years).filter(y => state.years[y].entries && state.years[y].entries[id]);
+      const ok = await confirmDialog({
+        title: 'Delete account?',
+        message: 'Delete "' + esc(acc.name) + '"' + (usedYears.length ? ' and its entries in ' + usedYears.join(', ') + '? Year totals already saved to the Overview are kept as-is.' : '?'),
+        confirmText: 'Delete account', danger: true,
+      });
+      if (!ok) return;
+      state.accounts = state.accounts.filter(a => a.id !== id);
+      Object.values(state.years).forEach(yr => { if (yr.entries) delete yr.entries[id]; });
+      save(); renderAll();
+      toast('Account deleted');
+    },
+
+    entryYearChanged(val) {
+      if (val === '__new__') { App.entryAddYear(); return; }
+      entryYear = Number(val);
+      renderAll();
+    },
+
+    entryAddYear() {
+      const rows = sortedRows();
+      let y = rows.length ? rows[rows.length - 1].year + 1 : new Date().getFullYear() - 1;
+      while (state.years[y]) y++;
+      const prevEnd = rows.length ? rows[rows.length - 1].ending || 0 : 0;
+      state.years[y] = { start: prevEnd, deposits: 0, ending: prevEnd, locked: false, entries: null };
+      entryYear = y;
+      save(); renderAll();
+      toast(y + ' added');
+    },
+
+    saveEntry() {
+      const yr = state.years[entryYear];
+      if (!yr || yr.locked) return;
+      const grid = document.getElementById('en-grid');
+      const entries = {};
+      let dep = 0, end = 0;
+      grid.querySelectorAll('.en-dep').forEach(i => {
+        const id = i.dataset.id;
+        entries[id] = entries[id] || { dep: 0, end: 0 };
+        entries[id].dep = parseNum(i.value);
+        dep += entries[id].dep;
+      });
+      grid.querySelectorAll('.en-end').forEach(i => {
+        const id = i.dataset.id;
+        entries[id] = entries[id] || { dep: 0, end: 0 };
+        entries[id].end = parseNum(i.value);
+        end += entries[id].end;
+      });
+      yr.start = parseNum(document.getElementById('en-start').value);
+      yr.entries = entries;
+      yr.deposits = dep;
+      yr.ending = end;
+      save(); renderAll();
+      const note = document.getElementById('en-sync-note');
+      if (note) note.textContent = 'Overview row for ' + entryYear + ' updated ✓';
+      toast(entryYear + ' saved — Overview updated');
+    },
+
+    /* --- analysis --- */
+    anInput() {
+      const a = state.settings.analysis;
+      a.start = parseNum(document.getElementById('an-start').value);
+      a.ret = parseNum(document.getElementById('an-ret').value);
+      a.dep = parseNum(document.getElementById('an-dep').value);
+      a.depGrowth = parseNum(document.getElementById('an-depg').value);
+      a.infl = parseNum(document.getElementById('an-infl').value);
+      a.target = parseNum(document.getElementById('an-target').value);
+      a.depUntil = Math.max(0, Math.min(MAX_HORIZON, Math.round(parseNum(document.getElementById('an-depyrs').value))));
+      a.wd = parseNum(document.getElementById('an-wd').value);
+      a.vol = parseNum(document.getElementById('an-vol').value);
+      a.mc = document.getElementById('an-mc').checked;
+      save();
+      renderAnalysis();
+    },
+
+    anUseCurrent() {
+      state.settings.analysis.start = null;   // null = track current balance
+      save();
+      renderAnalysis();
+      toast('Using current balance');
+    },
+
+    saveScenario() {
+      const nameInp = document.getElementById('an-scenario-name');
+      const name = nameInp.value.trim();
+      if (!name) { nameInp.focus(); toast('Give the scenario a name first'); return; }
+      const p = analysisParams();
+      const a = state.settings.analysis;
+      const now = new Date();
+      state.scenarios.push({
+        id: 's' + Date.now().toString(36),
+        name: name,
+        start: p.start,
+        ret: a.ret, dep: a.dep, depGrowth: a.depGrowth, infl: a.infl,
+        depUntil: a.depUntil == null ? MAX_HORIZON : a.depUntil, wd: a.wd || 0, vol: a.vol,
+        note: (document.getElementById('an-scenario-note').value || '').trim(),
+        baseYear: now.getFullYear(),
+        created: now.toISOString().slice(0, 10),
+        locked: false,
+      });
+      nameInp.value = '';
+      document.getElementById('an-scenario-note').value = '';
+      save();
+      toast('Scenario saved — see the Saved Scenarios tab');
+    },
+
+    /* --- scenarios --- */
+    async toggleScenarioLock(id) {
+      const s = state.scenarios.find(x => x.id === id);
+      if (!s) return;
+      if (s.locked) {
+        const ok = await confirmDialog({
+          title: 'Unlock scenario?',
+          message: 'Unlocking "' + esc(s.name) + '" allows it to be deleted.',
+          confirmText: 'Unlock', danger: false,
+        });
+        if (!ok) return;
+        s.locked = false;
+      } else {
+        s.locked = true;
+        toast('Scenario locked');
+      }
+      save(); renderAll();
+    },
+
+    async deleteScenario(id) {
+      const s = state.scenarios.find(x => x.id === id);
+      if (!s || s.locked) return;
+      const ok = await confirmDialog({
+        title: 'Delete scenario?',
+        message: 'Delete "' + esc(s.name) + '"? This cannot be undone.',
+        confirmText: 'Delete', danger: true,
+      });
+      if (!ok) return;
+      state.scenarios = state.scenarios.filter(x => x.id !== id);
+      state.settings.compareIds = (state.settings.compareIds || []).filter(x => x !== id);
+      save(); renderAll();
+      toast('Scenario deleted');
+    },
+
+    toggleCompare(id) {
+      let ids = state.settings.compareIds || [];
+      if (ids.includes(id)) {
+        if (ids.length === 1) return;   // keep at least one selected
+        ids = ids.filter(x => x !== id);
+      } else {
+        if (ids.length >= 3) { toast('Up to 3 scenarios can be overlaid — deselect one first'); return; }
+        ids = ids.concat(id);
+      }
+      state.settings.compareIds = ids;
+      save();
+      renderScenarios();
+    },
+
+    /* --- import / export --- */
+    async exportJSON() {
+      const pass = await promptDialog({
+        title: 'Backup',
+        message: 'Optionally protect the backup with a passphrase (AES-256, encrypted on your Mac — nothing leaves the browser). <b>Leave empty for a plain backup.</b> There is no recovery if you forget the passphrase.',
+        placeholder: 'passphrase (optional)', password: true, confirmText: 'Download backup',
+      });
+      if (pass === null) return;
+      let text = JSON.stringify(state, null, 2);
+      if (pass) {
+        try { text = await encryptJSON(text, pass); }
+        catch (e) { toast('Encryption failed — backup not saved'); return; }
+      }
+      const blob = new Blob([text], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'irr-tracker-backup-' + new Date().toISOString().slice(0, 10) + (pass ? '.encrypted' : '') + '.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      state.settings.lastBackupAt = Date.now();
+      save();
+      toast(pass ? 'Encrypted backup downloaded' : 'Backup downloaded');
+    },
+
+    importJSON() { document.getElementById('import-file').click(); },
+
+    /* --- file auto-save --- */
+    async fileButton() {
+      if (!fileSupported) return;
+      if (fileStatus === 'connected') {
+        const ok = await confirmDialog({
+          title: 'Disconnect data file?',
+          message: 'Stop auto-saving to "' + esc(fileHandle.name) + '"? The file keeps its current contents; the app keeps using browser storage.',
+          confirmText: 'Disconnect', danger: false,
+        });
+        if (!ok) return;
+        fileHandle = null; fileStatus = 'none';
+        await idb.del('fileHandle').catch(() => {});
+        renderFileStatus(); updateSaveIndicator();
+        return;
+      }
+      if ((fileStatus === 'reconnect' || fileStatus === 'error') && fileHandle) {
+        try {
+          const perm = await fileHandle.requestPermission({ mode: 'readwrite' });
+          if (perm === 'granted') {
+            fileStatus = 'connected';
+            await maybeLoadNewerFromFile();
+            renderFileStatus(); updateSaveIndicator();
+            scheduleFileWrite();
+            toast('Reconnected to ' + fileHandle.name);
+            return;
+          }
+        } catch (e) { /* fall through to picker */ }
+      }
+      try {
+        const h = await showSaveFilePicker({
+          suggestedName: 'irr-tracker-data.json',
+          types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+        });
+        fileHandle = h;
+        await idb.set('fileHandle', h).catch(() => {});
+        fileStatus = 'connected';
+        await writeFile();
+        state.settings.lastBackupAt = Date.now();
+        save();
+        renderFileStatus();
+        toast('Auto-saving to ' + h.name + ' — put it in iCloud Drive to sync');
+      } catch (e) { /* picker cancelled */ }
+    },
+
+    /* --- version history --- */
+    historyOpen() {
+      const snaps = JSON.parse(localStorage.getItem(SNAP_KEY) || '[]').slice().reverse();
+      const rows = snaps.map(sn => {
+        let years = '—', bal = '—';
+        try {
+          const d = JSON.parse(sn.data);
+          const ys = Object.keys(d.years || {}).map(Number).sort((a, b) => a - b);
+          years = ys.length ? ys[0] + '–' + ys[ys.length - 1] : 'none';
+          bal = ys.length ? fmtCompact(d.years[ys[ys.length - 1]].ending || 0) : '—';
+        } catch (e) {}
+        return '<tr><td>' + esc(sn.date) + '</td><td>' + years + '</td><td>' + bal + '</td>' +
+          '<td class="actions"><button class="btn btn-sm" onclick="App.restoreSnapshot(' + sn.ts + ')">Restore</button></td></tr>';
+      }).join('');
+      const root = document.getElementById('modal-root');
+      root.innerHTML =
+        '<div class="modal-backdrop"><div class="modal" style="max-width:520px" role="dialog" aria-modal="true">' +
+        '<h3>Version history</h3>' +
+        '<p>A snapshot is kept automatically for each day you make changes (last 20). Restoring saves a "pre-restore" snapshot of the current data first.</p>' +
+        (snaps.length
+          ? '<div class="table-scroll" style="max-height:300px;overflow-y:auto"><table class="data"><thead><tr><th>Snapshot</th><th>Years</th><th>Balance</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+          : '<p class="note">No snapshots yet — they appear as soon as you change data.</p>') +
+        '<div class="modal-actions" style="margin-top:16px"><button class="btn" id="m-close">Close</button></div></div></div>';
+      root.style.display = 'block';
+      const close = () => { root.style.display = 'none'; root.innerHTML = ''; };
+      root.querySelector('#m-close').onclick = close;
+      root.querySelector('.modal-backdrop').addEventListener('click', e => { if (e.target === e.currentTarget) close(); });
+    },
+
+    async restoreSnapshot(ts) {
+      const snaps = JSON.parse(localStorage.getItem(SNAP_KEY) || '[]');
+      const sn = snaps.find(x => x.ts === ts);
+      if (!sn) return;
+      document.getElementById('modal-root').style.display = 'none';
+      const ok = await confirmDialog({
+        title: 'Restore snapshot from ' + esc(sn.date) + '?',
+        message: 'Current data is snapshotted first (as "' + esc(new Date().toISOString().slice(0, 10)) + ' pre-restore"), then replaced by this snapshot.',
+        confirmText: 'Restore', danger: true,
+      });
+      if (!ok) return;
+      try {
+        const data = JSON.parse(sn.data);
+        snaps.push({ date: new Date().toISOString().slice(0, 10) + ' pre-restore', ts: Date.now(), data: JSON.stringify(state) });
+        while (snaps.length > 20) snaps.shift();
+        localStorage.setItem(SNAP_KEY, JSON.stringify(snaps));
+        adoptState(data);
+        toast('Snapshot restored');
+      } catch (e) { toast('Could not restore that snapshot'); }
+    },
+
+    /* --- CSV import --- */
+    async importCSV() {
+      const text = await textareaDialog({
+        title: 'Import years from CSV',
+        message: 'Paste rows as <b>Year, Deposits, Ending</b> or <b>Year, Starting, Deposits, Ending</b> (commas, semicolons or tabs; a header row is fine). Existing years are never overwritten.',
+        placeholder: '2019, 20000, 95000\n2020, 21000, 128500',
+        confirmText: 'Import',
+      });
+      if (text == null) return;
+      const parsed = [];
+      text.split(/\r?\n/).forEach(line => {
+        const cells = line.split(/[,;\t]/).map(c => c.replace(/["$\s]/g, ''));
+        if (!cells.length || /year/i.test(cells[0])) return;
+        const y = parseInt(cells[0], 10);
+        if (!y || y < 1900 || y > 2200) return;
+        if (cells.length >= 4) parsed.push({ y: y, start: parseNum(cells[1]), dep: parseNum(cells[2]), end: parseNum(cells[3]) });
+        else if (cells.length === 3) parsed.push({ y: y, start: null, dep: parseNum(cells[1]), end: parseNum(cells[2]) });
+      });
+      parsed.sort((a, b) => a.y - b.y);
+      if (!parsed.length) { toast('No usable rows found'); return; }
+      let added = 0, skipped = 0, prevEnd = null;
+      parsed.forEach(r => {
+        if (state.years[r.y]) { skipped++; prevEnd = state.years[r.y].ending; return; }
+        const before = sortedRows().filter(x => x.year < r.y).pop();
+        const start = r.start != null ? r.start : (prevEnd != null ? prevEnd : (before ? before.ending || 0 : 0));
+        state.years[r.y] = { start: start, deposits: r.dep, ending: r.end, locked: false, entries: null };
+        prevEnd = r.end;
+        added++;
+      });
+      save(); renderAll();
+      toast('Imported ' + added + ' year' + (added === 1 ? '' : 's') + (skipped ? ' (' + skipped + ' already existed — skipped)' : ''));
+    },
+
+    exportCSV() {
+      const rows = sortedRows();
+      if (!rows.length) { toast('Nothing to export yet'); return; }
+      let csv = 'Year,Starting Balance,Deposits,Ending Balance,Gain/Loss,Annual IRR\n';
+      rows.forEach(r => {
+        const gain = (r.ending || 0) - (r.start || 0) - (r.deposits || 0);
+        const irrY = yearIRR(r.start || 0, r.deposits || 0, r.ending || 0);
+        csv += [r.year, Math.round(r.start || 0), Math.round(r.deposits || 0), Math.round(r.ending || 0), Math.round(gain), irrY == null ? '' : (irrY * 100).toFixed(2) + '%'].join(',') + '\n';
+      });
+      const irr = overallIRR(rows);
+      csv += '\nOverall IRR,' + (irr == null ? '' : (irr * 100).toFixed(2) + '%') + '\n';
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'portfolio-overview-' + new Date().toISOString().slice(0, 10) + '.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast('CSV downloaded');
+    },
+
+    /* --- sample data --- */
+    async loadSample() {
+      const ok = await confirmDialog({
+        title: 'Load sample data?',
+        message: 'This fills the app with example accounts, years and a scenario so you can explore. You can delete it all later or just Restore a backup over it.',
+        confirmText: 'Load sample', danger: false,
+      });
+      if (!ok) return;
+      const nowY = new Date().getFullYear();
+      state = freshState();
+      state.accounts = [
+        { id: 'a1', name: '401(k)' },
+        { id: 'a2', name: 'Roth IRA' },
+        { id: 'a3', name: 'Brokerage' },
+      ];
+      const sample = [
+        // start, per-account [dep,end] x3
+        { y: nowY - 6, start: 25000, e: [[12000, 32000], [6000, 14500], [3000, 8200]] },
+        { y: nowY - 5, start: 54700, e: [[13000, 51000], [6000, 23000], [4000, 14000]] },
+        { y: nowY - 4, start: 88000, e: [[13500, 55000], [6500, 25500], [5000, 16500]] },
+        { y: nowY - 3, start: 97000, e: [[14000, 84000], [6500, 39000], [6000, 27500]] },
+        { y: nowY - 2, start: 150500, e: [[15000, 121000], [7000, 55500], [7000, 41000]] },
+        { y: nowY - 1, start: 217500, e: [[15500, 158000], [7000, 71500], [8000, 55000]] },
+      ];
+      sample.forEach(s => {
+        const entries = {};
+        let dep = 0, end = 0;
+        s.e.forEach((pair, i) => {
+          const id = 'a' + (i + 1);
+          entries[id] = { dep: pair[0], end: pair[1] };
+          dep += pair[0]; end += pair[1];
+        });
+        state.years[s.y] = { start: s.start, deposits: dep, ending: end, locked: s.y < nowY - 2, entries: entries };
+      });
+      state.years[nowY - 4].note = 'Rough market year — stayed the course';
+      state.scenarios = [{
+        id: 's-sample', name: '7% + $30k/yr baseline', start: 284500, ret: 7, dep: 30000, depGrowth: 2,
+        infl: 2.5, depUntil: 30, wd: 0, vol: 15, note: 'Steady-state plan as of ' + nowY,
+        baseYear: nowY, created: new Date().toISOString().slice(0, 10), locked: true,
+      }];
+      state.settings.compareIds = ['s-sample'];
+      entryYear = null; editingYear = null;
+      save(); renderAll();
+      toast('Sample data loaded');
+    },
+
+    renderAll() { renderAll(); },
+  };
+  window.App = App;
+
+  /* ---------------- Import handler ---------------- */
+
+  document.getElementById('import-file').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const text = await file.text();
+      let data = JSON.parse(text);
+      if (data && data.format === 'irr-encrypted-v1') {
+        const pass = await promptDialog({
+          title: 'Encrypted backup',
+          message: '"' + esc(file.name) + '" is encrypted. Enter its passphrase to decrypt (all local).',
+          password: true, confirmText: 'Decrypt',
+        });
+        if (pass === null) return;
+        try { data = JSON.parse(await decryptJSON(data, pass)); }
+        catch (e) { toast('Wrong passphrase (or corrupted file)'); return; }
+      }
+      if (!data || typeof data !== 'object' || !data.years) throw new Error('bad file');
+      const nYears = Object.keys(data.years).length;
+      const choice = await choiceDialog({
+        title: 'Restore "' + esc(file.name) + '"?',
+        message: 'The backup holds <b>' + nYears + ' year' + (nYears === 1 ? '' : 's') + ', ' +
+          (data.accounts || []).length + ' accounts, ' + (data.scenarios || []).length + ' scenarios</b>.<br><br>' +
+          '<b>Merge</b> adds years, accounts and scenarios you don\'t already have (nothing is overwritten). ' +
+          '<b>Replace</b> wipes current data and loads the backup.',
+        buttons: [
+          { id: 'cancel', label: 'Cancel' },
+          { id: 'merge', label: 'Merge', cls: 'btn-primary' },
+          { id: 'replace', label: 'Replace all', cls: 'btn-danger' },
+        ],
+      });
+      if (!choice || choice === 'cancel') return;
+      if (choice === 'replace') {
+        adoptState(data);
+        toast('Backup restored');
+      } else {
+        Object.keys(data.years || {}).forEach(y => { if (!state.years[y]) state.years[y] = data.years[y]; });
+        (data.accounts || []).forEach(a => { if (!state.accounts.some(x => x.id === a.id)) state.accounts.push(a); });
+        (data.scenarios || []).forEach(s => { if (!state.scenarios.some(x => x.id === s.id)) state.scenarios.push(s); });
+        save(); renderAll();
+        toast('Backup merged');
+      }
+    } catch (err) {
+      toast('Could not read that file — is it a Tracker backup?');
+    }
+  });
+
+  /* ---------------- Theme ---------------- */
+
+  function applyTheme() {
+    const t = state.settings.theme || 'auto';
+    if (t === 'auto') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', t);
+    const btn = document.getElementById('theme-btn');
+    if (btn) btn.textContent = 'Theme: ' + t.charAt(0).toUpperCase() + t.slice(1);
+  }
+
+  /* ---------------- Render root ---------------- */
+
+  function renderAll() {
+    if (currentTab === 'overview') renderOverview();
+    if (currentTab === 'entry') renderEntry();
+    if (currentTab === 'analysis') renderAnalysis();
+    if (currentTab === 'scenarios') renderScenarios();
+  }
+
+  // analysis inputs — live updates
+  ['an-start', 'an-ret', 'an-dep', 'an-depg', 'an-infl', 'an-target', 'an-depyrs', 'an-wd', 'an-vol'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => App.anInput());
+  });
+  document.getElementById('an-mc').addEventListener('change', () => App.anInput());
+
+  // re-render charts on theme flip (colors are CSS vars, but tooltip state resets cleanly)
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => renderAll());
+
+  applyTheme();
+  // ask the browser not to evict this origin's storage
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  save();
+  renderAll();
+  initFile();   // async: restores the connected-data-file handle, may offer newer file data
+})();
+</script>
+</body>
+</html>
