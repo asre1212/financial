@@ -59,7 +59,13 @@ current:
    **Paste balances** button fills the whole grid from spreadsheet rows
    (`Account name, deposits, ending` — tabs/commas, header row OK, matched by
    name case-insensitively, unknown accounts offered for creation), then you
-   review and Save.
+   review and Save. Each account also has a **History** button (🕐 next to its
+   name) to add or edit that one account's whole year-by-year history at once —
+   paste `Year, deposits, ending` (or `Year, ending`) rows and they're
+   distributed across the matching years; missing years are created (starting
+   balances chained from the nearest earlier year) and each affected year's
+   totals are recomputed from its accounts. Locked years are skipped, and the
+   box pre-fills with the account's current history so you can review or edit it.
 3. **Analysis** — project forward from your current balance (auto-filled) with
    your chosen annual return, annual deposits, deposit growth, and inflation.
    Shows 5/10/20/30-year outcomes (nominal and today's dollars), a milestone
