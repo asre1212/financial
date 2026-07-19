@@ -918,6 +918,7 @@ td input.cell-input:focus { outline: 2px solid var(--accent); outline-offset: -1
     trash:  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 4.5h11M5.5 4.5V3a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1.5M4 4.5l.6 8.4a1 1 0 0 0 1 .9h4.8a1 1 0 0 0 1-.9l.6-8.4"/></svg>',
     check:  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8.5l3.5 3.5 7.5-8"/></svg>',
     x:      '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg>',
+    history:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/></svg>',
   };
   function iconBtn(icon, title, onclick, opts) {
     opts = opts || {};
@@ -1009,7 +1010,7 @@ td input.cell-input:focus { outline: 2px solid var(--accent); outline-offset: -1
       root.innerHTML =
         '<div class="modal-backdrop"><div class="modal" style="max-width:560px" role="dialog" aria-modal="true">' +
         '<h3>' + esc(o.title) + '</h3><p>' + o.message + '</p>' +
-        '<textarea id="m-text" placeholder="' + esc(o.placeholder || '') + '"></textarea>' +
+        '<textarea id="m-text" placeholder="' + esc(o.placeholder || '') + '">' + esc(o.value || '') + '</textarea>' +
         '<div class="modal-actions">' +
         '<button class="btn" id="m-cancel">Cancel</button>' +
         '<button class="btn btn-primary" id="m-ok">' + esc(o.confirmText || 'Import') + '</button>' +
@@ -1672,6 +1673,7 @@ td input.cell-input:focus { outline: 2px solid var(--accent); outline-offset: -1
       accEl.innerHTML = state.accounts.map(a =>
         '<div class="account-row" data-id="' + esc(a.id) + '">' +
         '<span class="name">' + esc(a.name) + '</span>' +
+        iconBtn('history', 'Add / edit this account\'s year-by-year history', 'App.accountHistory(\'' + a.id + '\')') +
         iconBtn('edit', 'Rename account', 'App.renameAccount(\'' + a.id + '\')') +
         iconBtn('trash', 'Delete account', 'App.deleteAccount(\'' + a.id + '\')') +
         '</div>').join('');
@@ -2212,6 +2214,85 @@ td input.cell-input:focus { outline: 2px solid var(--accent); outline-offset: -1
       });
       updateEntryTotals();
       toast('Filled ' + filled + ' account' + (filled === 1 ? '' : 's') + ' — review, then Save');
+    },
+
+    // Add / edit a single account's full history at once: paste "Year, deposits, ending"
+    // rows and they're distributed across each year's per-account entries. Years that
+    // don't exist yet are created (start chained from the nearest earlier year); each
+    // affected year's totals are recomputed from its per-account entries.
+    async accountHistory(id) {
+      const acc = state.accounts.find(a => a.id === id);
+      if (!acc) return;
+      // pre-fill with this account's existing history so it can be reviewed / edited
+      const existing = sortedRows()
+        .filter(r => r.entries && r.entries[id])
+        .map(r => [r.year, Math.round(r.entries[id].dep || 0), Math.round(r.entries[id].end || 0)].join(', '));
+      const text = await textareaDialog({
+        title: 'History for ' + esc(acc.name),
+        message: 'One row per year for <b>' + esc(acc.name) + '</b>, copied straight from a spreadsheet:<br>' +
+          '<b>Year, deposits, ending balance</b> — or just <b>Year, ending balance</b> (deposits left at 0). ' +
+          'Commas, semicolons or tabs all work; a header row is fine. Missing years are created; each year\'s ' +
+          'totals are recomputed from its accounts. Locked years are skipped.',
+        placeholder: '2019, 12000, 48000\n2020, 13000, 65500\n2021, 14000, 82000',
+        value: existing.join('\n'),
+        confirmText: 'Save history',
+      });
+      if (text == null) return;
+      const parsed = [];
+      text.split(/\r?\n/).forEach(line => {
+        if (!line.trim()) return;
+        const cells = line.split(/[,;\t]/).map(c => c.replace(/["$\s]/g, ''));
+        if (!cells.length || /year/i.test(cells[0])) return;   // header row
+        const y = parseInt(cells[0], 10);
+        if (!y || y < 1900 || y > 2200) return;
+        if (cells.length >= 3) parsed.push({ y: y, dep: parseNum(cells[1]), end: parseNum(cells[2]) });
+        else if (cells.length === 2) parsed.push({ y: y, dep: null, end: parseNum(cells[1]) });
+      });
+      if (!parsed.length) { toast('No usable rows found'); return; }
+      parsed.sort((a, b) => a.y - b.y);
+
+      let added = 0, updated = 0, lockedSkipped = 0;
+      const affected = new Set(), addedYears = [];
+      parsed.forEach(r => {
+        let yr = state.years[r.y];
+        if (yr && yr.locked) { lockedSkipped++; return; }
+        if (!yr) {
+          const before = sortedRows().filter(x => x.year < r.y).pop();
+          const after = sortedRows().filter(x => x.year > r.y)[0];
+          const start = before ? before.ending || 0 : 0;
+          const ending = after ? after.start || 0 : start;
+          yr = state.years[r.y] = { start: start, deposits: 0, ending: ending, locked: false, entries: null };
+          added++; addedYears.push(r.y);
+        } else {
+          updated++;
+        }
+        if (!yr.entries) yr.entries = {};
+        yr.entries[id] = { dep: r.dep == null ? (yr.entries[id] ? yr.entries[id].dep || 0 : 0) : r.dep, end: r.end };
+        affected.add(r.y);
+      });
+
+      // recompute each affected year's totals from its per-account entries
+      affected.forEach(y => {
+        const yr = state.years[y];
+        let dep = 0, end = 0;
+        Object.values(yr.entries).forEach(e => { dep += e.dep || 0; end += e.end || 0; });
+        yr.deposits = dep;
+        yr.ending = end;
+      });
+
+      // now that endings are known, chain the start balance of each newly-created year
+      // from the nearest earlier year (existing years keep their user-set start)
+      addedYears.sort((a, b) => a - b).forEach(y => {
+        const before = sortedRows().filter(x => x.year < y).pop();
+        state.years[y].start = before ? before.ending || 0 : 0;
+      });
+
+      save(); renderAll();
+      const bits = [];
+      if (updated) bits.push(updated + ' year' + (updated === 1 ? '' : 's') + ' updated');
+      if (added) bits.push(added + ' added');
+      if (lockedSkipped) bits.push(lockedSkipped + ' locked skipped');
+      toast(esc(acc.name) + ' history saved — ' + (bits.join(', ') || 'no changes'));
     },
 
     saveEntry() {
