@@ -315,6 +315,22 @@ td input.cell-input:focus { outline: 2px solid var(--accent); outline-offset: -1
   border: 1px solid var(--baseline); background: var(--surface-1); color: var(--text-primary);
 }
 .modal textarea:focus, .modal input.modal-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.update-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  background: var(--wash); border: 1px solid var(--accent); border-radius: 12px;
+  padding: 10px 16px; margin: 0 0 18px; font-size: 13.5px;
+}
+.app-footer {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--grid);
+  color: var(--text-muted); font-size: 12px;
+}
+.app-footer .fld { flex: 1; min-width: 240px; }
+.app-footer input {
+  width: 100%; padding: 6px 10px; border-radius: 8px; font-size: 12px;
+  border: 1px solid var(--baseline); background: var(--surface-1); color: var(--text-primary);
+}
+.app-footer input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
 .field label.check { display: flex; align-items: center; gap: 8px; font-weight: 400; font-size: 13px; color: var(--text-primary); padding: 8px 0; cursor: pointer; }
 .field label.check input { width: 16px; height: 16px; accent-color: var(--accent); }
 @media print {
@@ -348,6 +364,8 @@ td input.cell-input:focus { outline: 2px solid var(--accent); outline-offset: -1
       <button class="btn btn-sm" id="theme-btn" onclick="App.cycleTheme()" title="Theme">Theme: Auto</button>
     </div>
   </header>
+
+  <div id="update-banner" class="no-print"></div>
 
   <nav class="tabs" role="tablist">
     <button class="tab-btn active" data-tab="overview"  onclick="App.showTab('overview')"  role="tab">Portfolio Overview</button>
@@ -563,6 +581,13 @@ td input.cell-input:focus { outline: 2px solid var(--accent); outline-offset: -1
     </div>
   </section>
 
+  <footer class="app-footer no-print">
+    <span id="app-version"></span>
+    <button class="btn btn-sm" onclick="App.checkUpdates(true)">Check for updates</button>
+    <span class="fld"><input id="update-url" placeholder="GitHub URL of index.html for update checks (raw or Pages URL)" onchange="App.setUpdateUrl(this.value)"></span>
+    <span>Update checks only <em>read</em> the latest version from GitHub — your data never leaves this browser.</span>
+  </footer>
+
 </div>
 
 <div id="modal-root"></div>
@@ -576,6 +601,7 @@ td input.cell-input:focus { outline: 2px solid var(--accent); outline-offset: -1
 (function () {
   'use strict';
 
+  const APP_VERSION = '2.2.0';   // bump this when publishing a new build to GitHub
   const LS_KEY = 'irr-tracker-v1';
   const HORIZONS = [5, 10, 20, 30];
   const MAX_HORIZON = 30;
@@ -623,6 +649,9 @@ td input.cell-input:focus { outline: 2px solid var(--accent); outline-offset: -1
                     depUntil: 30, wd: 0, vol: 15, mc: false },
         compareIds: [],
         lastBackupAt: null,
+        updateUrl: null,
+        lastUpdateCheck: 0,
+        skipVersion: null,
       },
       modifiedAt: 0,
     };
@@ -1121,6 +1150,122 @@ td input.cell-input:focus { outline: 2px solid var(--accent); outline-offset: -1
     } catch (e) { /* unreadable / not ours — ignore */ }
   }
 
+  /* ---------------- Auto-update from GitHub ---------------- */
+
+  let pendingUpdate = null;   // {version, text, url}
+
+  function cmpVer(a, b) {
+    const pa = String(a).split('.').map(n => parseInt(n, 10) || 0);
+    const pb = String(b).split('.').map(n => parseInt(n, 10) || 0);
+    for (let i = 0; i < 3; i++) { if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0); }
+    return 0;
+  }
+
+  function isHosted() {
+    return /^https?:$/.test(location.protocol) && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+  }
+
+  // Where to look for the latest index.html: the user-set GitHub URL, or —
+  // when the app is itself served from the web (e.g. GitHub Pages) — this page.
+  function updateSourceUrl() {
+    const u = (state.settings.updateUrl || '').trim();
+    if (u) return u;
+    if (isHosted()) return location.href.split(/[?#]/)[0];
+    return null;
+  }
+
+  async function checkUpdates(manual) {
+    const url = updateSourceUrl();
+    if (!url) { if (manual) toast('Paste your GitHub URL in the footer first'); return; }
+    if (!manual && Date.now() - (state.settings.lastUpdateCheck || 0) < 20 * 3600 * 1000) return;
+    try {
+      const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'nocache=' + Date.now(), { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const text = await res.text();
+      const m = text.match(/APP_VERSION\s*=\s*'([0-9.]+)'/);
+      if (!m) throw new Error('no version marker found at that URL');
+      state.settings.lastUpdateCheck = Date.now();
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+      if (cmpVer(m[1], APP_VERSION) > 0) {
+        if (!manual && state.settings.skipVersion === m[1]) return;
+        pendingUpdate = { version: m[1], text: text, url: url };
+        renderUpdateBanner();
+        if (manual) toast('Version ' + m[1] + ' is available');
+      } else {
+        pendingUpdate = null;
+        renderUpdateBanner();
+        if (manual) toast('You\'re on the latest version (v' + APP_VERSION + ')');
+      }
+    } catch (e) {
+      if (manual) toast('Update check failed — ' + e.message);
+    }
+  }
+
+  function renderUpdateBanner() {
+    const el = document.getElementById('update-banner');
+    if (!pendingUpdate) { el.innerHTML = ''; return; }
+    el.innerHTML = '<div class="update-banner"><span><b>Update available:</b> v' + esc(pendingUpdate.version) +
+      ' — you have v' + APP_VERSION + '</span>' +
+      '<span style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button class="btn btn-sm btn-primary" onclick="App.applyUpdate()">Update now</button>' +
+      '<button class="btn btn-sm" onclick="App.skipUpdate()">Skip this version</button>' +
+      '</span></div>';
+  }
+
+  async function applyUpdate() {
+    const r = pendingUpdate;
+    if (!r) return;
+    const t = r.text.trim();
+    // never install something that doesn't look like a complete copy of this app
+    const sane = /^<!doctype html>/i.test(t) && t.includes('Portfolio IRR Tracker') && /<\/html>$/.test(t);
+    if (!sane) { toast('Fetched copy looks incomplete — update not applied'); return; }
+
+    if (isHosted()) {
+      // the site itself is the source — a cache-busted reload picks up the new version
+      location.replace(location.pathname + '?v=' + Date.now());
+      return;
+    }
+    // running locally: rewrite the app file in place (Chrome/Edge), else download a fresh copy
+    if (fileSupported) {
+      try {
+        let h = await idb.get('appFileHandle');
+        if (h) {
+          try { if (await h.requestPermission({ mode: 'readwrite' }) !== 'granted') h = null; }
+          catch (e) { h = null; }
+        }
+        if (!h) {
+          const ok = await confirmDialog({
+            title: 'Update the app file in place?',
+            message: 'Pick this app\'s <b>index.html</b> in the next dialog and it will be replaced with v' + esc(r.version) +
+              '. Your data lives in the browser, not in the file — it is not touched. (You only pick the file once.)',
+            confirmText: 'Choose file', danger: false,
+          });
+          if (!ok) return;
+          const picks = await showOpenFilePicker({ types: [{ description: 'HTML', accept: { 'text/html': ['.html', '.htm'] } }], multiple: false });
+          h = picks && picks[0];
+          if (!h) return;
+          if (await h.requestPermission({ mode: 'readwrite' }) !== 'granted') { toast('Write permission denied'); return; }
+          await idb.set('appFileHandle', h).catch(() => {});
+        }
+        const w = await h.createWritable();
+        await w.write(r.text);
+        await w.close();
+        pendingUpdate = null;
+        renderUpdateBanner();
+        toast('Updated to v' + r.version + ' — reloading…');
+        setTimeout(() => location.reload(), 1200);
+        return;
+      } catch (e) { /* picker cancelled or write failed — fall through to download */ }
+    }
+    const blob = new Blob([r.text], { type: 'text/html' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'index.html';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast('New index.html downloaded — replace your old app file with it');
+  }
+
   async function initFile() {
     renderFileStatus();
     if (!fileSupported) return;
@@ -1582,6 +1727,7 @@ td input.cell-input:focus { outline: 2px solid var(--accent); outline-offset: -1
     html += '<div class="inline-form" style="margin-top:16px;justify-content:space-between;width:100%">' +
       '<div style="display:flex;gap:8px">' +
       '<button class="btn btn-primary" onclick="App.saveEntry()"' + (locked ? ' disabled style="opacity:.5;cursor:not-allowed"' : '') + '>Save → updates Overview</button>' +
+      '<button class="btn" onclick="App.pasteBalances()"' + (locked ? ' disabled style="opacity:.5;cursor:not-allowed"' : '') + ' title="Paste account/deposit/ending rows copied from a spreadsheet">Paste balances</button>' +
       '<button class="btn" onclick="App.toggleLock(' + entryYear + ')">' + (locked ? 'Unlock ' + entryYear : 'Lock ' + entryYear) + '</button>' +
       '</div>' +
       '<span class="note" id="en-sync-note"></span></div>';
@@ -1844,14 +1990,33 @@ td input.cell-input:focus { outline: 2px solid var(--accent); outline-offset: -1
     },
 
     /* --- overview: years --- */
-    addYear() {
+    // Shared add-year flow: prompts for the year (prior years welcome), chains balances.
+    async addYearFlow() {
       const rows = sortedRows();
-      let y = rows.length ? rows[rows.length - 1].year + 1 : new Date().getFullYear() - 1;
-      while (state.years[y]) y++;
-      const prevEnd = rows.length ? rows[rows.length - 1].ending || 0 : 0;
-      state.years[y] = { start: prevEnd, deposits: 0, ending: prevEnd, locked: false, entries: null };
-      editingYear = y;
+      let suggested = rows.length ? rows[rows.length - 1].year + 1 : new Date().getFullYear() - 1;
+      while (state.years[suggested]) suggested++;
+      const val = await promptDialog({
+        title: 'Add year',
+        message: 'Which year? Prior years are fine (e.g. 2015) — the starting balance chains from the nearest earlier year, and the ending balance pre-fills from the next year\'s start. Leave empty for <b>' + suggested + '</b>.',
+        placeholder: String(suggested), confirmText: 'Add year',
+      });
+      if (val === null) return null;
+      const y = parseInt(String(val).trim() === '' ? suggested : String(val).trim(), 10);
+      if (!y || y < 1900 || y > 2200) { toast('Enter a 4-digit year, e.g. 2016'); return null; }
+      if (state.years[y]) { toast(y + ' already exists'); return null; }
+      const prev = rows.filter(r => r.year < y).pop();
+      const next = rows.filter(r => r.year > y)[0];
+      const start = prev ? prev.ending || 0 : 0;
+      const ending = next ? next.start || 0 : start;
+      state.years[y] = { start: start, deposits: 0, ending: ending, locked: false, entries: null };
       save();
+      return y;
+    },
+
+    async addYear() {
+      const y = await App.addYearFlow();
+      if (y == null) { renderAll(); return; }
+      editingYear = y;
       if (currentTab !== 'overview') App.showTab('overview'); else renderAll();
     },
 
@@ -1988,15 +2153,65 @@ td input.cell-input:focus { outline: 2px solid var(--accent); outline-offset: -1
       renderAll();
     },
 
-    entryAddYear() {
-      const rows = sortedRows();
-      let y = rows.length ? rows[rows.length - 1].year + 1 : new Date().getFullYear() - 1;
-      while (state.years[y]) y++;
-      const prevEnd = rows.length ? rows[rows.length - 1].ending || 0 : 0;
-      state.years[y] = { start: prevEnd, deposits: 0, ending: prevEnd, locked: false, entries: null };
+    async entryAddYear() {
+      const y = await App.addYearFlow();
+      if (y == null) { renderAll(); return; }   // also resets the select away from "＋ Add new year…"
       entryYear = y;
-      save(); renderAll();
+      renderAll();
       toast(y + ' added');
+    },
+
+    // Paste a block of "Account, deposits, ending" rows (straight from a spreadsheet)
+    // into the selected year's grid. Fills the inputs for review — Save commits.
+    async pasteBalances() {
+      const yr = state.years[entryYear];
+      if (!yr || yr.locked) return;
+      const text = await textareaDialog({
+        title: 'Paste balances for ' + entryYear,
+        message: 'One row per account, copied straight from a spreadsheet:<br>' +
+          '<b>Account name, deposits, ending balance</b> — or just <b>Account name, ending balance</b> (deposits left untouched). ' +
+          'Tabs, commas or semicolons all work; a header row is fine. Accounts are matched by name; unknown names can be added.',
+        placeholder: '401(k)\t15500\t158000\nRoth IRA\t7000\t71500\nBrokerage\t8000\t55000',
+        confirmText: 'Fill grid',
+      });
+      if (text == null) return;
+      const parsed = [];
+      text.split(/\r?\n/).forEach(line => {
+        if (!line.trim()) return;
+        const cells = line.split(/[\t;,]/).map(c => c.replace(/^\s*"|"\s*$/g, '').trim());
+        if (cells.length < 2 || !cells[0]) return;
+        if (/^account/i.test(cells[0]) && /(deposit|ending|balance)/i.test(cells.slice(1).join(' '))) return; // header row
+        if (cells.length >= 3) parsed.push({ name: cells[0], dep: parseNum(cells[1]), end: parseNum(cells[2]) });
+        else parsed.push({ name: cells[0], dep: null, end: parseNum(cells[1]) });
+      });
+      if (!parsed.length) { toast('No usable rows found'); return; }
+      const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const unknown = parsed.filter(r => !state.accounts.some(a => norm(a.name) === norm(r.name)));
+      if (unknown.length) {
+        const ok = await confirmDialog({
+          title: 'Add ' + unknown.length + ' new account' + (unknown.length > 1 ? 's' : '') + '?',
+          message: 'Not in your account list yet: <b>' + unknown.map(u => esc(u.name)).join(', ') + '</b>. Add them and continue filling?',
+          confirmText: 'Add & fill', danger: false,
+        });
+        if (!ok) return;
+        unknown.forEach(u => state.accounts.push({
+          id: 'a' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36),
+          name: u.name,
+        }));
+        save();
+      }
+      renderEntry();   // grid now includes any new accounts
+      let filled = 0;
+      parsed.forEach(r => {
+        const acc = state.accounts.find(a => norm(a.name) === norm(r.name));
+        if (!acc) return;
+        const depInp = document.querySelector('.en-dep[data-id="' + acc.id + '"]');
+        const endInp = document.querySelector('.en-end[data-id="' + acc.id + '"]');
+        if (endInp) { endInp.value = Math.round(r.end); filled++; }
+        if (depInp && r.dep != null) depInp.value = Math.round(r.dep);
+      });
+      updateEntryTotals();
+      toast('Filled ' + filled + ' account' + (filled === 1 ? '' : 's') + ' — review, then Save');
     },
 
     saveEntry() {
@@ -2296,6 +2511,25 @@ td input.cell-input:focus { outline: 2px solid var(--accent); outline-offset: -1
       toast('CSV downloaded');
     },
 
+    /* --- updates --- */
+    checkUpdates(manual) { checkUpdates(!!manual); },
+    applyUpdate() { applyUpdate(); },
+    skipUpdate() {
+      if (!pendingUpdate) return;
+      state.settings.skipVersion = pendingUpdate.version;
+      pendingUpdate = null;
+      save();
+      renderUpdateBanner();
+      toast('Skipping that version — you\'ll be told about the next one');
+    },
+    setUpdateUrl(v) {
+      state.settings.updateUrl = String(v).trim() || null;
+      state.settings.skipVersion = null;
+      save();
+      toast(state.settings.updateUrl ? 'Update source saved' : (isHosted() ? 'Using this page\'s own URL for update checks' : 'Update checks disabled'));
+      if (state.settings.updateUrl) checkUpdates(true);
+    },
+
     /* --- sample data --- */
     async loadSample() {
       const ok = await confirmDialog({
@@ -2305,7 +2539,9 @@ td input.cell-input:focus { outline: 2px solid var(--accent); outline-offset: -1
       });
       if (!ok) return;
       const nowY = new Date().getFullYear();
+      const keepUpdateUrl = state.settings.updateUrl;
       state = freshState();
+      state.settings.updateUrl = keepUpdateUrl;
       state.accounts = [
         { id: 'a1', name: '401(k)' },
         { id: 'a2', name: 'Roth IRA' },
@@ -2426,9 +2662,15 @@ td input.cell-input:focus { outline: 2px solid var(--accent); outline-offset: -1
   applyTheme();
   // ask the browser not to evict this origin's storage
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  document.getElementById('app-version').textContent = 'Portfolio IRR Tracker v' + APP_VERSION;
+  document.getElementById('update-url').value = state.settings.updateUrl || '';
+  if (isHosted() && !state.settings.updateUrl) {
+    document.getElementById('update-url').placeholder = 'auto: checking this page\'s own URL — paste a different URL to override';
+  }
   save();
   renderAll();
   initFile();   // async: restores the connected-data-file handle, may offer newer file data
+  setTimeout(() => checkUpdates(false), 2500);   // daily background check (only if a source URL exists)
 })();
 </script>
 </body>

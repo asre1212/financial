@@ -21,6 +21,28 @@ GitHub Pages, the *page* is public but *your data* never leaves your browser.
 > move data between them, and back up periodically — clearing browser data
 > clears the tracker too.
 
+## Automatic updates from GitHub
+
+The app version lives in an `APP_VERSION` constant at the top of the script —
+bump it whenever you push a new build to GitHub. The app then keeps itself
+current:
+
+- **Hosted on GitHub Pages:** nothing to configure. Once a day (and via the
+  footer's "Check for updates" button) the app re-fetches its own URL, and if
+  the published version is newer it shows an *Update available* banner — one
+  click reloads into the new version. Your data is untouched (it lives in the
+  browser, not the page).
+- **Running locally:** paste the GitHub URL of `index.html` (the raw URL or
+  your Pages URL) into the footer field once. When an update is found,
+  "Update now" rewrites your local `index.html` in place — you pick the file
+  the first time (Chrome/Edge), after that it's one click. Safari falls back
+  to downloading a fresh `index.html` to replace manually.
+- "Skip this version" mutes the banner until the next release. A fetched copy
+  is sanity-checked (complete HTML, right app, version marker) before it is
+  ever written.
+- Privacy: the check is a read-only download from GitHub; nothing about your
+  portfolio is sent anywhere.
+
 ## The four tabs
 
 1. **Portfolio Overview** — headline stats (current balance, total deposits,
@@ -31,7 +53,13 @@ GitHub Pages, the *page* is public but *your data* never leaves your browser.
 2. **Data Entry** — define your accounts (401k, Roth IRA, brokerage…), pick a
    year from the dropdown, and enter each account's deposits and year-end
    balance. Totals flow automatically into the matching Overview row. Years can
-   be locked here too so old data can't be fat-fingered.
+   be locked here too so old data can't be fat-fingered. "Add new year" asks
+   which year — **prior years (2015, 2016, …) are fine**; balances chain from
+   the nearest neighbors, and gap years are handled in the IRR math. The
+   **Paste balances** button fills the whole grid from spreadsheet rows
+   (`Account name, deposits, ending` — tabs/commas, header row OK, matched by
+   name case-insensitively, unknown accounts offered for creation), then you
+   review and Save.
 3. **Analysis** — project forward from your current balance (auto-filled) with
    your chosen annual return, annual deposits, deposit growth, and inflation.
    Shows 5/10/20/30-year outcomes (nominal and today's dollars), a milestone
